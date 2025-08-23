@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LavinMQ Video Streaming Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .status {
+            padding: 10px 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .status.connecting {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
+        .status.connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .video-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+            height: 480px;
+        }
+        
+        #frameDisplay {
+            max-width: 100%;
+            height: auto;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            background-color: #f8f9fa;
+            min-height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #6c757d;
+            font-size: 18px;
+        }
+        
+        .stats {
+            margin-top: 20px;
+        }
+        
+        .stats h3 {
+            margin: 20px 0 15px 0;
+            color: #495057;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 5px;
+        }
+        
+        .stats h3:first-child {
+            margin-top: 0;
+        }
+        
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+            border: 1px solid #e9ecef;
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        
+        .stat-label {
+            color: #6c757d;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        
+        button.primary {
+            background-color: #007bff;
+            color: white;
+        }
+        
+        button.primary:hover {
+            background-color: #0056b3;
+        }
+        
+        button.secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+        
+        button.secondary:hover {
+            background-color: #545b62;
+        }
+        
+        .speed-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 15px 0;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border: 1px solid #e9ecef;
+            flex-wrap: wrap;
+        }
+        
+        .speed-controls label {
+            font-weight: bold;
+            color: #495057;
+        }
+        
+        .speed-controls input[type="number"] {
+            width: 80px;
+            padding: 8px 12px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            background-color: white;
+            font-size: 14px;
+        }
+        
+        .speed-controls button {
+            padding: 6px 12px;
+            font-size: 12px;
+            margin: 0;
+        }
+        
+        .speed-controls span {
+            color: #6c757d;
+            font-size: 14px;
+            margin-left: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 LavinMQ Video Streaming Demo</h1>
+        
+        <div id="status" class="status connecting">Ready - Click "Start Consumer" to begin</div>
+        
+        <div class="video-container">
+            <div id="frameDisplay">
+                <div class="placeholder">Waiting for video frames...</div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button id="startBtn" class="primary" onclick="startConsumer()">Start Consumer</button>
+            <button id="stopBtn" class="secondary" onclick="stopConsumer()" disabled>Stop Consumer</button>
+            <button id="runProducerBtn" class="primary" onclick="runProducer()">Run Producer</button>
+            <button id="clearBtn" class="secondary" onclick="clearDisplay()">Clear</button>
+        </div>
+        
+        <div class="speed-controls">
+            <label for="displayFps">Display FPS:</label>
+            <input type="number" id="displayFps" value="5" min="0.1" max="60" step="0.1" onchange="updateDisplayFps()">
+            <button onclick="setPresetFps(1)" class="secondary">1 FPS</button>
+            <button onclick="setPresetFps(5)" class="secondary">5 FPS</button>
+            <button onclick="setPresetFps(10)" class="secondary">10 FPS</button>
+            <button onclick="setPresetFps(30)" class="secondary">30 FPS</button>
+            <span id="queueInfo">Queue: 0 frames</span>
+        </div>
+        
+        <div class="stats">
+            <h3>📡 Consumer Stats</h3>
+            <div class="stat-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="frameCount">0</div>
+                    <div class="stat-label">Frames Received</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="fps">0</div>
+                    <div class="stat-label">Receive FPS</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="currentFrame">-</div>
+                    <div class="stat-label">Current Frame</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="latency">-</div>
+                    <div class="stat-label">Processing Time (ms)</div>
+                </div>
+            </div>
+            
+            <h3>🎬 Producer Stats</h3>
+            <div class="stat-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="producerStatus">Idle</div>
+                    <div class="stat-label">Status</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="producerProgress">0%</div>
+                    <div class="stat-label">Progress</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="producerFps">0</div>
+                    <div class="stat-label">Publish FPS</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="producerFrames">0/0</div>
+                    <div class="stat-label">Frames Published</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="producerData">0MB</div>
+                    <div class="stat-label">Data Sent</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let frameCount = 0;
+        let lastFrameTime = Date.now();
+        let fpsCounter = 0;
+        let fpsInterval;
+        let producerStatsInterval;
+        
+        // Frame display queue and rate limiting
+        let frameQueue = [];
+        let isDisplaying = false;
+        let displayInterval = 200; // milliseconds between frame displays (5 FPS)
+        let lastDisplayTime = 0;
+
+        const statusElement = document.getElementById('status');
+        const frameDisplay = document.getElementById('frameDisplay');
+        const frameCountElement = document.getElementById('frameCount');
+        const fpsElement = document.getElementById('fps');
+        const currentFrameElement = document.getElementById('currentFrame');
+        const latencyElement = document.getElementById('latency');
+        
+        // Producer stats elements
+        const producerStatusElement = document.getElementById('producerStatus');
+        const producerProgressElement = document.getElementById('producerProgress');
+        const producerFpsElement = document.getElementById('producerFps');
+        const producerFramesElement = document.getElementById('producerFrames');
+        const producerDataElement = document.getElementById('producerData');
+
+        function updateStatus(message, type) {
+            statusElement.textContent = message;
+            statusElement.className = `status ${type}`;
+        }
+
+        function connect() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}`;
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = function() {
+                updateStatus('Connected - Waiting for frames', 'connected');
+                console.log('Connected to server');
+            };
+            
+            ws.onmessage = function(event) {
+                try {
+                    const frameData = JSON.parse(event.data);
+                    console.log('WebSocket received frame:', frameData.frameNumber);
+                    // Use queue system
+                    displayFrame(frameData);
+                } catch (error) {
+                    console.error('Error parsing frame data:', error);
+                    console.log('Raw message:', event.data.substring(0, 100));
+                }
+            };
+            
+            ws.onclose = function() {
+                updateStatus('Connection closed - Click reconnect to try again', 'error');
+                console.log('Connection closed');
+            };
+            
+            ws.onerror = function(error) {
+                updateStatus('Connection error - Check if server is running', 'error');
+                console.error('WebSocket error:', error);
+            };
+        }
+
+        function displayFrame(frameData) {
+            console.log(`Received frame ${frameData.frameNumber} via WebSocket`);
+            
+            // Add frame to queue with receive timestamp
+            frameData.receivedAt = Date.now();
+            frameQueue.push(frameData);
+            updateQueueInfo();
+            
+            // Start display timer if not running
+            if (!isDisplaying) {
+                isDisplaying = true;
+                processNextFrame();
+            }
+        }
+        
+        function processNextFrame() {
+            if (frameQueue.length === 0) {
+                isDisplaying = false;
+                console.log('Queue empty, stopping display');
+                return;
+            }
+            
+            // Get and display next frame
+            const frameData = frameQueue.shift();
+            const processingStartTime = Date.now();
+            console.log(`Displaying frame ${frameData.frameNumber}, queue: ${frameQueue.length}`);
+            
+            // Add processing start time to frame data
+            frameData.processingStartTime = processingStartTime;
+            actuallyDisplayFrame(frameData);
+            
+            // Schedule next frame
+            setTimeout(processNextFrame, displayInterval);
+        }
+        
+        function actuallyDisplayFrame(frameData) {
+            const { frameNumber, timestamp, data, mimeType, receivedAt, processingStartTime } = frameData;
+            
+            // Hide placeholder text if it exists
+            const placeholder = frameDisplay.querySelector('.placeholder');
+            if (placeholder) {
+                placeholder.style.display = 'none';
+            }
+            
+            // Create new image element
+            const img = document.createElement('img');
+            img.src = `data:${mimeType};base64,${data}`;
+            img.alt = `Frame ${frameNumber}`;
+            img.style.maxWidth = '100%';
+            img.style.height = 'auto';
+            
+            // Replace current content
+            const images = frameDisplay.querySelectorAll('img');
+            images.forEach(oldImg => frameDisplay.removeChild(oldImg));
+            frameDisplay.appendChild(img);
+            
+            const processingEndTime = Date.now();
+            
+            // Update statistics
+            frameCount++;
+            fpsCounter++;
+            frameCountElement.textContent = frameCount;
+            currentFrameElement.textContent = frameNumber;
+            
+            // Calculate actual processing time (excluding FPS delay)
+            const processingTime = processingEndTime - processingStartTime;
+            latencyElement.textContent = `${processingTime}ms`;
+            
+            // Update queue info
+            updateQueueInfo();
+            
+            console.log(`Displayed frame ${frameNumber}, processing time: ${processingTime}ms`);
+        }
+        
+        function updateDisplayFps() {
+            const input = document.getElementById('displayFps');
+            let fps = parseFloat(input.value);
+            
+            // Validate FPS range
+            if (fps < 0.1) {
+                fps = 0.1;
+                input.value = fps;
+            } else if (fps > 60) {
+                fps = 60;
+                input.value = fps;
+            }
+            
+            displayInterval = Math.round(1000 / fps);
+            console.log(`Display FPS changed to ${fps} FPS (${displayInterval}ms interval)`);
+        }
+        
+        function setPresetFps(fps) {
+            const input = document.getElementById('displayFps');
+            input.value = fps;
+            updateDisplayFps();
+        }
+        
+        function updateQueueInfo() {
+            const queueInfo = document.getElementById('queueInfo');
+            queueInfo.textContent = `Queue: ${frameQueue.length} frames`;
+            
+            // Color code based on queue size
+            if (frameQueue.length > 20) {
+                queueInfo.style.color = '#dc3545'; // Red for high queue
+            } else if (frameQueue.length > 10) {
+                queueInfo.style.color = '#fd7e14'; // Orange for medium queue
+            } else {
+                queueInfo.style.color = '#6c757d'; // Gray for low queue
+            }
+        }
+
+        function updateFPS() {
+            fpsElement.textContent = fpsCounter;
+            fpsCounter = 0;
+        }
+
+        function startConsumer() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                updateStatus('Already connected', 'connected');
+                return;
+            }
+            
+            updateStatus('Connecting...', 'connecting');
+            connect();
+            
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+        }
+
+        function stopConsumer() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+            updateStatus('Disconnected', 'error');
+            
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+        }
+
+        async function runProducer() {
+            const btn = document.getElementById('runProducerBtn');
+            btn.disabled = true;
+            btn.textContent = 'Running Producer...';
+            
+            try {
+                const response = await fetch('/api/run-producer', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    updateStatus(`Producer started: ${result.message}`, 'connected');
+                    // Start polling for producer stats
+                    startProducerStatsPolling();
+                } else {
+                    updateStatus(`Producer error: ${result.error}`, 'error');
+                }
+                
+            } catch (error) {
+                updateStatus(`Failed to start producer: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Run Producer';
+            }
+        }
+
+        async function fetchProducerStats() {
+            try {
+                const response = await fetch('/api/producer-stats');
+                const stats = await response.json();
+                updateProducerStats(stats);
+            } catch (error) {
+                console.error('Failed to fetch producer stats:', error);
+            }
+        }
+
+        function updateProducerStats(stats) {
+            producerStatusElement.textContent = stats.isRunning ? 'Running' : 'Idle';
+            producerStatusElement.parentElement.style.backgroundColor = stats.isRunning ? '#d4edda' : '#f8f9fa';
+            
+            producerProgressElement.textContent = `${stats.progress.toFixed(1)}%`;
+            producerFpsElement.textContent = stats.currentFps.toFixed(1);
+            producerFramesElement.textContent = `${stats.framesPublished}/${stats.totalFrames}`;
+            producerDataElement.textContent = `${stats.totalDataSent.toFixed(2)}MB`;
+        }
+
+        function startProducerStatsPolling() {
+            if (producerStatsInterval) {
+                clearInterval(producerStatsInterval);
+            }
+            
+            // Fetch stats immediately and then every 500ms
+            fetchProducerStats();
+            producerStatsInterval = setInterval(fetchProducerStats, 500);
+            
+            // Stop polling after producer is likely done (give it extra time)
+            setTimeout(() => {
+                if (producerStatsInterval) {
+                    clearInterval(producerStatsInterval);
+                    producerStatsInterval = null;
+                    // Fetch final stats
+                    setTimeout(fetchProducerStats, 1000);
+                }
+            }, 30000); // 30 seconds timeout
+        }
+
+        function testDisplayFrame(frameData) {
+            const { frameNumber, timestamp, data, mimeType } = frameData;
+            console.log('Displaying frame directly:', frameNumber);
+            
+            // Hide placeholder
+            const placeholder = frameDisplay.querySelector('.placeholder');
+            if (placeholder) {
+                placeholder.style.display = 'none';
+            }
+            
+            // Create and display image immediately
+            const img = document.createElement('img');
+            img.src = `data:${mimeType};base64,${data}`;
+            img.alt = `Frame ${frameNumber}`;
+            img.style.maxWidth = '100%';
+            img.style.height = 'auto';
+            
+            frameDisplay.innerHTML = '';
+            frameDisplay.appendChild(img);
+            
+            // Update basic stats
+            frameCountElement.textContent = frameNumber;
+            currentFrameElement.textContent = frameNumber;
+            latencyElement.textContent = Date.now() - timestamp;
+        }
+
+        function clearDisplay() {
+            frameDisplay.innerHTML = '<div class="placeholder">Display cleared - Waiting for frames...</div>';
+            frameCount = 0;
+            fpsCounter = 0;
+            frameCountElement.textContent = '0';
+            fpsElement.textContent = '0';
+            currentFrameElement.textContent = '-';
+            latencyElement.textContent = '-';
+            
+            // Clear frame queue
+            frameQueue = [];
+            updateQueueInfo();
+        }
+
+        // Initialize FPS counter but don't auto-connect
+        fpsInterval = setInterval(updateFPS, 1000);
+        updateStatus('Ready - Click "Start Consumer" to begin', 'connecting');
+        
+        // Fetch initial producer stats
+        fetchProducerStats();
+        
+        // Test frame queue functionality
+        console.log('Testing display queue initialization...');
+        console.log('displayInterval:', displayInterval, 'ms');
+        console.log('frameQueue:', frameQueue);
+        console.log('isDisplaying:', isDisplaying);
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', function() {
+            if (ws) {
+                ws.close();
+            }
+            clearInterval(fpsInterval);
+            if (producerStatsInterval) {
+                clearInterval(producerStatsInterval);
+            }
+        });
+    </script>
+</body>
+</html>
