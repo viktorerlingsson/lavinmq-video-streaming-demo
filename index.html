@@ -376,17 +376,18 @@
                 placeholder.style.display = 'none';
             }
             
-            // Create new image element
-            const img = document.createElement('img');
+            // Find existing image or create new one
+            let img = frameDisplay.querySelector('img');
+            if (!img) {
+                img = document.createElement('img');
+                img.style.maxWidth = '100%';
+                img.style.height = 'auto';
+                frameDisplay.appendChild(img);
+            }
+            
+            // Update the image source (avoids flicker by reusing same element)
             img.src = `data:${mimeType};base64,${data}`;
             img.alt = `Frame ${frameNumber}`;
-            img.style.maxWidth = '100%';
-            img.style.height = 'auto';
-            
-            // Replace current content
-            const images = frameDisplay.querySelectorAll('img');
-            images.forEach(oldImg => frameDisplay.removeChild(oldImg));
-            frameDisplay.appendChild(img);
             
             const processingEndTime = Date.now();
             
