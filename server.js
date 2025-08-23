@@ -177,7 +177,7 @@ class FrameConsumer {
     try {
       this.connection = await amqp.connect(this.lavinMQUrl);
       this.channel = await this.connection.createChannel();
-      await this.channel.assertQueue(QUEUE_NAME, { durable: false });
+      await this.channel.assertQueue(QUEUE_NAME, { durable: true });
       console.log('Connected to LavinMQ');
     } catch (error) {
       console.error('Failed to connect to LavinMQ:', error.message);
