@@ -26,6 +26,9 @@ let currentProducerStats = {
   publishingTime: 0
 };
 
+// Store video metadata for clients
+let currentVideoMetadata = null;
+
 app.use(express.static('public'));
 app.use(express.json());
 
@@ -111,6 +114,49 @@ app.get('/api/producer-stats', (req, res) => {
   res.json(currentProducerStats);
 });
 
+// API endpoint to get video metadata
+app.get('/api/video-metadata', (req, res) => {
+  if (currentVideoMetadata) {
+    res.json(currentVideoMetadata);
+  } else {
+    res.status(404).json({ 
+      error: 'No video metadata available',
+      message: 'Run producer first or ensure stream queue has metadata' 
+    });
+  }
+});
+
+// API endpoint to restart consumer with replay option
+app.post('/api/restart-consumer', async (req, res) => {
+  const { fromBeginning = true } = req.body;
+  
+  try {
+    // Stop current consumer
+    if (isConsuming) {
+      await consumer.close();
+      isConsuming = false;
+    }
+    
+    // Reconnect and start consuming with specified mode
+    await consumer.connect();
+    await consumer.startConsuming(fromBeginning);
+    isConsuming = true;
+    
+    res.json({
+      success: true,
+      message: `Consumer restarted ${fromBeginning ? 'from beginning (replay mode)' : 'from next message (live mode)'}`,
+      mode: fromBeginning ? 'replay' : 'live'
+    });
+    
+  } catch (error) {
+    console.error('Failed to restart consumer:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Parse stats from producer console output
 function parseProducerStats(message) {
   try {
@@ -177,45 +223,137 @@ class FrameConsumer {
     try {
       this.connection = await amqp.connect(this.lavinMQUrl);
       this.channel = await this.connection.createChannel();
-      await this.channel.assertQueue(QUEUE_NAME, { durable: true });
-      console.log('Connected to LavinMQ');
+      
+      // Try to check if queue exists first to get metadata
+      let queueExists = false;
+      try {
+        const queueInfo = await this.channel.checkQueue(QUEUE_NAME);
+        queueExists = true;
+        
+        if (queueInfo && queueInfo.arguments) {
+          const args = queueInfo.arguments;
+          if (args['x-video-width'] && args['x-video-height']) {
+            currentVideoMetadata = {
+              width: parseInt(args['x-video-width']),
+              height: parseInt(args['x-video-height']),
+              fps: parseFloat(args['x-video-fps']),
+              duration: parseFloat(args['x-video-duration']),
+              codec: args['x-video-codec'],
+              bitrate: args['x-video-bitrate'] ? parseInt(args['x-video-bitrate']) : null
+            };
+            console.log('📹 Retrieved video metadata from existing queue:', currentVideoMetadata);
+          }
+        }
+      } catch (error) {
+        // Queue doesn't exist yet
+        console.log('Queue does not exist yet, will be created by producer');
+      }
+      
+      // Only assert queue if it doesn't exist (let producer create it with metadata)
+      if (!queueExists) {
+        await this.channel.assertQueue(QUEUE_NAME, { 
+          durable: true,
+          arguments: {
+            'x-queue-type': 'stream',
+          }
+        });
+        console.log('Created basic stream queue (producer will add metadata)');
+      }
+      
+      console.log('Connected to LavinMQ with stream queue');
     } catch (error) {
       console.error('Failed to connect to LavinMQ:', error.message);
       throw error;
     }
   }
 
-  async startConsuming() {
-    console.log(`Starting to consume from queue: ${QUEUE_NAME}`);
+  async startConsuming(fromBeginning = true) {
+    console.log(`Starting to consume from queue: ${QUEUE_NAME}${fromBeginning ? ' (from beginning for replay)' : ''}`);
+    
+    // Configure consumer options for stream replay
+    const consumeOptions = {
+      noAck: false,
+      arguments: fromBeginning ? {
+        'x-stream-offset': 'first' // Start from beginning for replay capability
+      } : {
+        'x-stream-offset': 'next' // Start from next message for live streaming
+      }
+    };
     
     await this.channel.consume(QUEUE_NAME, (message) => {
       if (message !== null) {
         try {
           const frameData = JSON.parse(message.content.toString());
           
+          // Store video metadata from first frame
+          if (frameData.metadata && !currentVideoMetadata) {
+            currentVideoMetadata = frameData.metadata;
+            console.log('📹 Stored video metadata:', currentVideoMetadata);
+          }
+          
           console.log(`Received frame ${frameData.frameNumber}, WebSocket clients: ${wss.clients.size}`);
+          
+          // For now, send as JSON to debug (will optimize to binary later)
+          const jsonMessage = JSON.stringify({
+            frameNumber: frameData.frameNumber,
+            timestamp: frameData.timestamp,
+            data: frameData.imageData, // This is already base64
+            mimeType: frameData.mimeType,
+            metadata: frameData.metadata
+          });
           
           // Broadcast frame to all connected WebSocket clients
           wss.clients.forEach((client) => {
             if (client.readyState === WebSocket.OPEN) {
-              client.send(JSON.stringify(frameData));
+              client.send(jsonMessage);
               console.log(`Sent frame ${frameData.frameNumber} to WebSocket client`);
             }
           });
           
           console.log(`Broadcasted frame ${frameData.frameNumber}`);
+          
           this.channel.ack(message);
           
         } catch (error) {
           console.error('Error processing message:', error.message);
           this.channel.nack(message, false, false);
         }
-      } else {
-        console.log('Received null message');
       }
-    });
+    }, consumeOptions);
     
-    console.log('Started consuming frames from LavinMQ');
+    console.log('Started consuming frames from LavinMQ stream');
+  }
+
+  createBinaryMessage(frameData) {
+    // Create efficient binary message format
+    // Structure: [Header][Image Data]
+    // Header: frameNumber(4) + timestamp(8) + mimeTypeLength(1) + mimeType + metadataLength(4) + metadata
+    
+    const imageBuffer = Buffer.from(frameData.imageData, 'base64');
+    const mimeTypeBuffer = Buffer.from(frameData.mimeType, 'utf8');
+    const metadataBuffer = frameData.metadata ? Buffer.from(JSON.stringify(frameData.metadata), 'utf8') : Buffer.alloc(0);
+    
+    // Calculate total size
+    const headerSize = 4 + 8 + 1 + mimeTypeBuffer.length + 4 + metadataBuffer.length;
+    const totalSize = headerSize + imageBuffer.length;
+    
+    const binaryMessage = Buffer.allocUnsafe(totalSize);
+    let offset = 0;
+    
+    // Write header
+    binaryMessage.writeUInt32LE(frameData.frameNumber, offset); offset += 4;
+    binaryMessage.writeBigUInt64LE(BigInt(frameData.timestamp), offset); offset += 8;
+    binaryMessage.writeUInt8(mimeTypeBuffer.length, offset); offset += 1;
+    mimeTypeBuffer.copy(binaryMessage, offset); offset += mimeTypeBuffer.length;
+    binaryMessage.writeUInt32LE(metadataBuffer.length, offset); offset += 4;
+    if (metadataBuffer.length > 0) {
+      metadataBuffer.copy(binaryMessage, offset); offset += metadataBuffer.length;
+    }
+    
+    // Write image data
+    imageBuffer.copy(binaryMessage, offset);
+    
+    return binaryMessage;
   }
 
   async close() {

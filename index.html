@@ -10,18 +10,20 @@
             max-width: 1200px;
             margin: 0 auto;
             padding: 20px;
-            background-color: #f5f5f5;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
         }
         
         .container {
-            background: white;
+            background: #2d2d2d;
             border-radius: 8px;
             padding: 30px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 20px rgba(0,0,0,0.3);
+            border: 1px solid #3d3d3d;
         }
         
         h1 {
-            color: #333;
+            color: #ffffff;
             text-align: center;
             margin-bottom: 30px;
         }
@@ -35,21 +37,21 @@
         }
         
         .status.connecting {
-            background-color: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffeaa7;
+            background-color: #3d3d00;
+            color: #ffeb3b;
+            border: 1px solid #ffc107;
         }
         
         .status.connected {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
+            background-color: #1b5e20;
+            color: #4caf50;
+            border: 1px solid #2e7d32;
         }
         
         .status.error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
+            background-color: #c62828;
+            color: #ffcdd2;
+            border: 1px solid #d32f2f;
         }
         
         .video-container {
@@ -62,15 +64,15 @@
         #frameDisplay {
             max-width: 100%;
             height: auto;
-            border: 2px solid #ddd;
+            border: 2px solid #555;
             border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            background-color: #f8f9fa;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+            background-color: #1e1e1e;
             min-height: 300px;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: #6c757d;
+            color: #aaa;
             font-size: 18px;
         }
         
@@ -80,8 +82,8 @@
         
         .stats h3 {
             margin: 20px 0 15px 0;
-            color: #495057;
-            border-bottom: 2px solid #e9ecef;
+            color: #ffffff;
+            border-bottom: 2px solid #555;
             padding-bottom: 5px;
         }
         
@@ -97,21 +99,21 @@
         }
         
         .stat-card {
-            background: #f8f9fa;
+            background: #3d3d3d;
             padding: 15px;
             border-radius: 5px;
             text-align: center;
-            border: 1px solid #e9ecef;
+            border: 1px solid #555;
         }
         
         .stat-value {
             font-size: 24px;
             font-weight: bold;
-            color: #007bff;
+            color: #64b5f6;
         }
         
         .stat-label {
-            color: #6c757d;
+            color: #bbb;
             font-size: 14px;
             margin-top: 5px;
         }
@@ -133,21 +135,21 @@
         }
         
         button.primary {
-            background-color: #007bff;
+            background-color: #1976d2;
             color: white;
         }
         
         button.primary:hover {
-            background-color: #0056b3;
+            background-color: #1565c0;
         }
         
         button.secondary {
-            background-color: #6c757d;
+            background-color: #616161;
             color: white;
         }
         
         button.secondary:hover {
-            background-color: #545b62;
+            background-color: #424242;
         }
         
         .speed-controls {
@@ -156,23 +158,24 @@
             gap: 10px;
             margin: 15px 0;
             padding: 15px;
-            background-color: #f8f9fa;
+            background-color: #3d3d3d;
             border-radius: 5px;
-            border: 1px solid #e9ecef;
+            border: 1px solid #555;
             flex-wrap: wrap;
         }
         
         .speed-controls label {
             font-weight: bold;
-            color: #495057;
+            color: #ffffff;
         }
         
         .speed-controls input[type="number"] {
             width: 80px;
             padding: 8px 12px;
-            border: 1px solid #ced4da;
+            border: 1px solid #555;
             border-radius: 4px;
-            background-color: white;
+            background-color: #2d2d2d;
+            color: #e0e0e0;
             font-size: 14px;
         }
         
@@ -183,7 +186,7 @@
         }
         
         .speed-controls span {
-            color: #6c757d;
+            color: #bbb;
             font-size: 14px;
             margin-left: auto;
         }
@@ -209,12 +212,20 @@
         </div>
         
         <div class="speed-controls">
+            <label>Stream Mode:</label>
+            <button onclick="restartConsumer(true)" class="primary">Replay from Beginning</button>
+            <button onclick="restartConsumer(false)" class="secondary">Live Stream</button>
+            <span id="streamMode">Mode: Live</span>
+        </div>
+        
+        <div class="speed-controls">
             <label for="displayFps">Display FPS:</label>
             <input type="number" id="displayFps" value="5" min="0.1" max="60" step="0.1" onchange="updateDisplayFps()">
             <button onclick="setPresetFps(1)" class="secondary">1 FPS</button>
             <button onclick="setPresetFps(5)" class="secondary">5 FPS</button>
             <button onclick="setPresetFps(10)" class="secondary">10 FPS</button>
             <button onclick="setPresetFps(30)" class="secondary">30 FPS</button>
+            <button onclick="setUnlimitedMode()" class="primary">Unlimited</button>
             <span id="queueInfo">Queue: 0 frames</span>
         </div>
         
@@ -262,6 +273,26 @@
                     <div class="stat-label">Data Sent</div>
                 </div>
             </div>
+            
+            <h3>📹 Video Info</h3>
+            <div class="stat-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="videoResolution">-</div>
+                    <div class="stat-label">Resolution</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="videoFps">-</div>
+                    <div class="stat-label">Original FPS</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="videoDuration">-</div>
+                    <div class="stat-label">Duration</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="videoCodec">-</div>
+                    <div class="stat-label">Codec</div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -272,12 +303,17 @@
         let fpsCounter = 0;
         let fpsInterval;
         let producerStatsInterval;
+        let videoMetadataInterval;
         
         // Frame display queue and rate limiting
         let frameQueue = [];
         let isDisplaying = false;
         let displayInterval = 200; // milliseconds between frame displays (5 FPS)
         let lastDisplayTime = 0;
+        let unlimitedMode = false;
+        
+        // Video metadata
+        let currentVideoMetadata = null;
 
         const statusElement = document.getElementById('status');
         const frameDisplay = document.getElementById('frameDisplay');
@@ -292,10 +328,62 @@
         const producerFpsElement = document.getElementById('producerFps');
         const producerFramesElement = document.getElementById('producerFrames');
         const producerDataElement = document.getElementById('producerData');
+        
+        // Video metadata elements
+        const videoResolutionElement = document.getElementById('videoResolution');
+        const videoFpsElement = document.getElementById('videoFps');
+        const videoDurationElement = document.getElementById('videoDuration');
+        const videoCodecElement = document.getElementById('videoCodec');
 
         function updateStatus(message, type) {
             statusElement.textContent = message;
             statusElement.className = `status ${type}`;
+        }
+
+        function parseBinaryMessage(arrayBuffer) {
+            // Parse binary message format
+            // Structure: frameNumber(4) + timestamp(8) + mimeTypeLength(1) + mimeType + metadataLength(4) + metadata + imageData
+            
+            const dataView = new DataView(arrayBuffer);
+            let offset = 0;
+            
+            // Read header
+            const frameNumber = dataView.getUint32(offset, true); offset += 4;
+            const timestamp = Number(dataView.getBigUint64(offset, true)); offset += 8;
+            const mimeTypeLength = dataView.getUint8(offset); offset += 1;
+            
+            // Read mime type
+            const mimeTypeBytes = new Uint8Array(arrayBuffer, offset, mimeTypeLength);
+            const mimeType = new TextDecoder().decode(mimeTypeBytes);
+            offset += mimeTypeLength;
+            
+            // Read metadata
+            const metadataLength = dataView.getUint32(offset, true); offset += 4;
+            let metadata = null;
+            if (metadataLength > 0) {
+                const metadataBytes = new Uint8Array(arrayBuffer, offset, metadataLength);
+                const metadataText = new TextDecoder().decode(metadataBytes);
+                metadata = JSON.parse(metadataText);
+                offset += metadataLength;
+            }
+            
+            // Read image data
+            const imageBytes = new Uint8Array(arrayBuffer, offset);
+            
+            // Convert to base64 for img src
+            let binary = '';
+            for (let i = 0; i < imageBytes.byteLength; i++) {
+                binary += String.fromCharCode(imageBytes[i]);
+            }
+            const data = btoa(binary);
+            
+            return {
+                frameNumber,
+                timestamp,
+                data,
+                mimeType,
+                metadata
+            };
         }
 
         function connect() {
@@ -313,11 +401,20 @@
                 try {
                     const frameData = JSON.parse(event.data);
                     console.log('WebSocket received frame:', frameData.frameNumber);
+                    
+                    // Handle video metadata from first frame
+                    if (frameData.metadata && !currentVideoMetadata) {
+                        currentVideoMetadata = frameData.metadata;
+                        updateVideoMetadataDisplay();
+                        // Only auto-set FPS when explicitly requested
+                        // setDisplayFpsFromVideo() is now called only from startConsumer() and restartConsumer()
+                    }
+                    
                     // Use queue system
                     displayFrame(frameData);
                 } catch (error) {
                     console.error('Error parsing frame data:', error);
-                    console.log('Raw message:', event.data.substring(0, 100));
+                    console.log('Raw message:', typeof event.data === 'string' ? event.data.substring(0, 100) : 'Binary data');
                 }
             };
             
@@ -337,17 +434,32 @@
             
             // Add frame to queue with receive timestamp
             frameData.receivedAt = Date.now();
-            frameQueue.push(frameData);
-            updateQueueInfo();
             
-            // Start display timer if not running
-            if (!isDisplaying) {
-                isDisplaying = true;
-                processNextFrame();
+            if (unlimitedMode) {
+                // In unlimited mode, display immediately and clear queue
+                frameQueue = [frameData]; // Keep only latest frame
+                actuallyDisplayFrame(frameData);
+                updateQueueInfo();
+            } else {
+                // Normal queued mode
+                frameQueue.push(frameData);
+                updateQueueInfo();
+                
+                // Start display timer if not running
+                if (!isDisplaying) {
+                    isDisplaying = true;
+                    processNextFrame();
+                }
             }
         }
         
         function processNextFrame() {
+            if (unlimitedMode) {
+                // In unlimited mode, don't schedule next frame processing
+                isDisplaying = false;
+                return;
+            }
+            
             if (frameQueue.length === 0) {
                 isDisplaying = false;
                 console.log('Queue empty, stopping display');
@@ -385,6 +497,17 @@
                 frameDisplay.appendChild(img);
             }
             
+            // Set proper dimensions if metadata is available
+            if (currentVideoMetadata) {
+                const maxWidth = 800; // Max display width
+                const aspectRatio = currentVideoMetadata.width / currentVideoMetadata.height;
+                const displayWidth = Math.min(maxWidth, currentVideoMetadata.width);
+                const displayHeight = displayWidth / aspectRatio;
+                
+                img.style.width = `${displayWidth}px`;
+                img.style.height = `${displayHeight}px`;
+            }
+            
             // Update the image source (avoids flicker by reusing same element)
             img.src = `data:${mimeType};base64,${data}`;
             img.alt = `Frame ${frameNumber}`;
@@ -411,6 +534,9 @@
             const input = document.getElementById('displayFps');
             let fps = parseFloat(input.value);
             
+            // Disable unlimited mode when FPS is set
+            unlimitedMode = false;
+            
             // Validate FPS range
             if (fps < 0.1) {
                 fps = 0.1;
@@ -422,6 +548,7 @@
             
             displayInterval = Math.round(1000 / fps);
             console.log(`Display FPS changed to ${fps} FPS (${displayInterval}ms interval)`);
+            updateQueueInfo();
         }
         
         function setPresetFps(fps) {
@@ -430,17 +557,28 @@
             updateDisplayFps();
         }
         
+        function setUnlimitedMode() {
+            unlimitedMode = true;
+            const input = document.getElementById('displayFps');
+            input.value = '∞';
+            console.log('Unlimited mode enabled - displaying frames as fast as possible');
+            updateQueueInfo();
+        }
+        
         function updateQueueInfo() {
             const queueInfo = document.getElementById('queueInfo');
-            queueInfo.textContent = `Queue: ${frameQueue.length} frames`;
+            const modeText = unlimitedMode ? ' (Unlimited Mode)' : '';
+            queueInfo.textContent = `Queue: ${frameQueue.length} frames${modeText}`;
             
-            // Color code based on queue size
-            if (frameQueue.length > 20) {
+            // Color code based on queue size or mode
+            if (unlimitedMode) {
+                queueInfo.style.color = '#64b5f6'; // Blue for unlimited mode
+            } else if (frameQueue.length > 20) {
                 queueInfo.style.color = '#dc3545'; // Red for high queue
             } else if (frameQueue.length > 10) {
                 queueInfo.style.color = '#fd7e14'; // Orange for medium queue
             } else {
-                queueInfo.style.color = '#6c757d'; // Gray for low queue
+                queueInfo.style.color = '#bbb'; // Gray for low queue
             }
         }
 
@@ -457,6 +595,11 @@
             
             updateStatus('Connecting...', 'connecting');
             connect();
+            
+            // Auto-set FPS when starting fresh consumer
+            if (currentVideoMetadata) {
+                setDisplayFpsFromVideo();
+            }
             
             document.getElementById('startBtn').disabled = true;
             document.getElementById('stopBtn').disabled = false;
@@ -584,12 +727,96 @@
             updateQueueInfo();
         }
 
+        async function restartConsumer(fromBeginning = true) {
+            try {
+                const response = await fetch('/api/restart-consumer', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ fromBeginning })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    updateStatus(`Consumer restarted: ${result.message}`, 'connected');
+                    
+                    // Update mode indicator
+                    const streamModeElement = document.getElementById('streamMode');
+                    streamModeElement.textContent = `Mode: ${result.mode === 'replay' ? 'Replay' : 'Live'}`;
+                    
+                    // Clear current display and stats
+                    clearDisplay();
+                    
+                    // Auto-set FPS when restarting consumer (replay or live)
+                    if (currentVideoMetadata) {
+                        setDisplayFpsFromVideo();
+                    }
+                    
+                    // Ensure WebSocket is connected
+                    if (!ws || ws.readyState !== WebSocket.OPEN) {
+                        connect();
+                        document.getElementById('startBtn').disabled = true;
+                        document.getElementById('stopBtn').disabled = false;
+                    }
+                    
+                } else {
+                    updateStatus(`Consumer restart error: ${result.error}`, 'error');
+                }
+                
+            } catch (error) {
+                updateStatus(`Failed to restart consumer: ${error.message}`, 'error');
+                console.error('Error restarting consumer:', error);
+            }
+        }
+
+        async function fetchVideoMetadata() {
+            try {
+                const response = await fetch('/api/video-metadata');
+                if (response.ok) {
+                    const metadata = await response.json();
+                    currentVideoMetadata = metadata;
+                    updateVideoMetadataDisplay();
+                    setDisplayFpsFromVideo();
+                } else {
+                    console.log('No video metadata available yet');
+                }
+            } catch (error) {
+                console.error('Failed to fetch video metadata:', error);
+            }
+        }
+
+        function updateVideoMetadataDisplay() {
+            if (!currentVideoMetadata) return;
+            
+            videoResolutionElement.textContent = `${currentVideoMetadata.width}x${currentVideoMetadata.height}`;
+            videoFpsElement.textContent = `${currentVideoMetadata.fps.toFixed(1)}`;
+            videoDurationElement.textContent = `${currentVideoMetadata.duration.toFixed(1)}s`;
+            videoCodecElement.textContent = currentVideoMetadata.codec;
+            
+            console.log('Updated video metadata display:', currentVideoMetadata);
+        }
+
+        function setDisplayFpsFromVideo() {
+            if (!currentVideoMetadata) return;
+            
+            const input = document.getElementById('displayFps');
+            input.value = currentVideoMetadata.fps;
+            updateDisplayFps();
+            console.log(`Auto-set display FPS to ${currentVideoMetadata.fps} from video metadata`);
+        }
+
         // Initialize FPS counter but don't auto-connect
         fpsInterval = setInterval(updateFPS, 1000);
         updateStatus('Ready - Click "Start Consumer" to begin', 'connecting');
         
-        // Fetch initial producer stats
+        // Fetch initial producer stats and video metadata
         fetchProducerStats();
+        fetchVideoMetadata();
+        
+        // Poll for video metadata every 2 seconds in case it becomes available
+        videoMetadataInterval = setInterval(fetchVideoMetadata, 2000);
         
         // Test frame queue functionality
         console.log('Testing display queue initialization...');
@@ -605,6 +832,9 @@
             clearInterval(fpsInterval);
             if (producerStatsInterval) {
                 clearInterval(producerStatsInterval);
+            }
+            if (videoMetadataInterval) {
+                clearInterval(videoMetadataInterval);
             }
         });
     </script>

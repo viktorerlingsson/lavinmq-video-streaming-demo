@@ -12,19 +12,90 @@ class VideoFrameProducer {
     this.queueName = 'video_frames';
   }
 
-  async connect() {
+  async connect(videoMetadata = null) {
     try {
       this.connection = await amqp.connect(this.lavinMQUrl);
       this.channel = await this.connection.createChannel();
-      await this.channel.assertQueue(this.queueName, { durable: true });
-      console.log('Connected to LavinMQ');
+      
+      // Delete existing queue to ensure clean slate with correct metadata
+      try {
+        await this.channel.deleteQueue(this.queueName);
+        console.log('Deleted existing queue to refresh metadata');
+      } catch (error) {
+        // Queue might not exist, which is fine
+        console.log('No existing queue to delete');
+      }
+      
+      // Configure as stream queue for replay capability
+      const queueArgs = {
+        'x-queue-type': 'stream',
+        'x-max-age': '1h' // Keep messages for 1 hour
+      };
+      
+      // Add video metadata as queue arguments if provided
+      if (videoMetadata) {
+        queueArgs['x-video-width'] = videoMetadata.width.toString();
+        queueArgs['x-video-height'] = videoMetadata.height.toString();
+        queueArgs['x-video-fps'] = videoMetadata.fps.toString();
+        queueArgs['x-video-duration'] = videoMetadata.duration.toString();
+        queueArgs['x-video-codec'] = videoMetadata.codec;
+        if (videoMetadata.bitrate) {
+          queueArgs['x-video-bitrate'] = videoMetadata.bitrate.toString();
+        }
+      }
+      
+      await this.channel.assertQueue(this.queueName, { 
+        durable: true,
+        arguments: queueArgs
+      });
+      
+      console.log(`Connected to LavinMQ with fresh stream queue${videoMetadata ? ' (with metadata)' : ''}`);
     } catch (error) {
       console.error('Failed to connect to LavinMQ:', error.message);
       throw error;
     }
   }
 
+  async getVideoMetadata() {
+    return new Promise((resolve, reject) => {
+      ffmpeg.ffprobe(this.videoPath, (err, metadata) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        
+        const videoStream = metadata.streams.find(stream => stream.codec_type === 'video');
+        if (!videoStream) {
+          reject(new Error('No video stream found'));
+          return;
+        }
+        
+        const videoMetadata = {
+          duration: parseFloat(metadata.format.duration),
+          width: videoStream.width,
+          height: videoStream.height,
+          fps: eval(videoStream.r_frame_rate), // Parse fraction like "30/1"
+          codec: videoStream.codec_name,
+          bitrate: metadata.format.bit_rate ? parseInt(metadata.format.bit_rate) : null
+        };
+        
+        resolve(videoMetadata);
+      });
+    });
+  }
+
   async extractAndPublishFrames() {
+    // Get video metadata first
+    const videoMetadata = await this.getVideoMetadata();
+    console.log('📹 VIDEO METADATA:');
+    console.log(`   Resolution: ${videoMetadata.width}x${videoMetadata.height}`);
+    console.log(`   Original FPS: ${videoMetadata.fps}`);
+    console.log(`   Duration: ${videoMetadata.duration.toFixed(2)}s`);
+    console.log(`   Codec: ${videoMetadata.codec}`);
+    if (videoMetadata.bitrate) {
+      console.log(`   Bitrate: ${Math.round(videoMetadata.bitrate / 1000)}kbps`);
+    }
+    
     const tempDir = path.join(__dirname, 'temp_frames');
     await fs.ensureDir(tempDir);
 
@@ -36,7 +107,8 @@ class VideoFrameProducer {
       publishingEndTime: null,
       totalFrames: 0,
       framesPublished: 0,
-      totalDataSent: 0
+      totalDataSent: 0,
+      videoMetadata: videoMetadata
     };
 
     return new Promise((resolve, reject) => {
@@ -47,9 +119,10 @@ class VideoFrameProducer {
         .outputOptions([
           '-vf fps=10', // Extract 10 frames per second
           '-f image2',
-          '-vcodec png'
+          '-vcodec mjpeg',
+          '-q:v 3' // High quality JPEG (1-31, lower = better quality)
         ])
-        .output(path.join(tempDir, 'frame_%04d.png'))
+        .output(path.join(tempDir, 'frame_%04d.jpg'))
         .on('end', async () => {
           stats.extractionEndTime = Date.now();
           stats.totalFrames = frameCount;
@@ -74,22 +147,30 @@ class VideoFrameProducer {
             for (let i = 0; i < frameFiles.length; i++) {
               const framePath = path.join(tempDir, frameFiles[i]);
               const frameBuffer = await fs.readFile(framePath);
-              const base64Frame = frameBuffer.toString('base64');
               
-              const message = {
+              // Create message with base64 encoded image (for JSON compatibility with current server)
+              const metadata = i === 0 ? videoMetadata : null;
+              const frameMessage = {
                 frameNumber: i,
                 timestamp: Date.now(),
-                data: base64Frame,
-                mimeType: 'image/png'
+                imageData: frameBuffer.toString('base64'), // Convert to base64 for JSON
+                mimeType: 'image/jpeg',
+                metadata: metadata
               };
               
-              const messageBuffer = Buffer.from(JSON.stringify(message));
+              // Serialize as JSON for now (can optimize further later)
+              const messageBuffer = Buffer.from(JSON.stringify(frameMessage));
               stats.totalDataSent += messageBuffer.length;
               
               await this.channel.sendToQueue(
                 this.queueName,
                 messageBuffer,
-                { persistent: true }
+                { 
+                  persistent: true,
+                  // Add message properties for stream replay
+                  messageId: `frame_${i}`,
+                  timestamp: Date.now()
+                }
               );
               
               publishedCount++;
@@ -178,7 +259,9 @@ async function main() {
   const producer = new VideoFrameProducer(videoPath, lavinMQUrl);
 
   try {
-    await producer.connect();
+    // Get metadata first, then connect with it
+    const videoMetadata = await producer.getVideoMetadata();
+    await producer.connect(videoMetadata);
     await producer.extractAndPublishFrames();
   } catch (error) {
     console.error('Error:', error.message);
