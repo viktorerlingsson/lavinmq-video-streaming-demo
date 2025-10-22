@@ -29,7 +29,7 @@ let currentProducerStats = {
 // Store video metadata for clients
 let currentVideoMetadata = null;
 
-app.use(express.static('public'));
+app.use(express.static(__dirname));
 app.use(express.json());
 
 app.get('/', (req, res) => {

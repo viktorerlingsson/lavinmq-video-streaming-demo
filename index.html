@@ -4,193 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LavinMQ Video Streaming Demo</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #1a1a1a;
-            color: #e0e0e0;
-        }
-        
-        .container {
-            background: #2d2d2d;
-            border-radius: 8px;
-            padding: 30px;
-            box-shadow: 0 2px 20px rgba(0,0,0,0.3);
-            border: 1px solid #3d3d3d;
-        }
-        
-        h1 {
-            color: #ffffff;
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        
-        .status {
-            padding: 10px 20px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            text-align: center;
-            font-weight: bold;
-        }
-        
-        .status.connecting {
-            background-color: #3d3d00;
-            color: #ffeb3b;
-            border: 1px solid #ffc107;
-        }
-        
-        .status.connected {
-            background-color: #1b5e20;
-            color: #4caf50;
-            border: 1px solid #2e7d32;
-        }
-        
-        .status.error {
-            background-color: #c62828;
-            color: #ffcdd2;
-            border: 1px solid #d32f2f;
-        }
-        
-        .video-container {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 20px;
-            height: 480px;
-        }
-        
-        #frameDisplay {
-            max-width: 100%;
-            height: auto;
-            border: 2px solid #555;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.4);
-            background-color: #1e1e1e;
-            min-height: 300px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #aaa;
-            font-size: 18px;
-        }
-        
-        .stats {
-            margin-top: 20px;
-        }
-        
-        .stats h3 {
-            margin: 20px 0 15px 0;
-            color: #ffffff;
-            border-bottom: 2px solid #555;
-            padding-bottom: 5px;
-        }
-        
-        .stats h3:first-child {
-            margin-top: 0;
-        }
-        
-        .stat-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        
-        .stat-card {
-            background: #3d3d3d;
-            padding: 15px;
-            border-radius: 5px;
-            text-align: center;
-            border: 1px solid #555;
-        }
-        
-        .stat-value {
-            font-size: 24px;
-            font-weight: bold;
-            color: #64b5f6;
-        }
-        
-        .stat-label {
-            color: #bbb;
-            font-size: 14px;
-            margin-top: 5px;
-        }
-        
-        .controls {
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            margin-top: 20px;
-        }
-        
-        button {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: background-color 0.3s;
-        }
-        
-        button.primary {
-            background-color: #1976d2;
-            color: white;
-        }
-        
-        button.primary:hover {
-            background-color: #1565c0;
-        }
-        
-        button.secondary {
-            background-color: #616161;
-            color: white;
-        }
-        
-        button.secondary:hover {
-            background-color: #424242;
-        }
-        
-        .speed-controls {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin: 15px 0;
-            padding: 15px;
-            background-color: #3d3d3d;
-            border-radius: 5px;
-            border: 1px solid #555;
-            flex-wrap: wrap;
-        }
-        
-        .speed-controls label {
-            font-weight: bold;
-            color: #ffffff;
-        }
-        
-        .speed-controls input[type="number"] {
-            width: 80px;
-            padding: 8px 12px;
-            border: 1px solid #555;
-            border-radius: 4px;
-            background-color: #2d2d2d;
-            color: #e0e0e0;
-            font-size: 14px;
-        }
-        
-        .speed-controls button {
-            padding: 6px 12px;
-            font-size: 12px;
-            margin: 0;
-        }
-        
-        .speed-controls span {
-            color: #bbb;
-            font-size: 14px;
-            margin-left: auto;
-        }
-    </style>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="container">
@@ -248,6 +62,14 @@
                     <div class="stat-value" id="latency">-</div>
                     <div class="stat-label">Processing Time (ms)</div>
                 </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="displayFpsActual">0</div>
+                    <div class="stat-label">Display FPS</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="totalDataReceived">0MB</div>
+                    <div class="stat-label">Data Received</div>
+                </div>
             </div>
             
             <h3>🎬 Producer Stats</h3>
@@ -272,6 +94,30 @@
                     <div class="stat-value" id="producerData">0MB</div>
                     <div class="stat-label">Data Sent</div>
                 </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="avgProducerFps">-</div>
+                    <div class="stat-label">Average Publish FPS</div>
+                </div>
+            </div>
+            
+            <h3>🔗 Network & Performance</h3>
+            <div class="stat-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="connectionStatus">-</div>
+                    <div class="stat-label">Connection</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="uptime">0s</div>
+                    <div class="stat-label">Uptime</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="droppedFrames">0</div>
+                    <div class="stat-label">Dropped Frames</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="networkLatency">-</div>
+                    <div class="stat-label">Network Latency (ms)</div>
+                </div>
             </div>
             
             <h3>📹 Video Info</h3>
@@ -291,6 +137,14 @@
                 <div class="stat-card">
                     <div class="stat-value" id="videoCodec">-</div>
                     <div class="stat-label">Codec</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="compressionRatio">-</div>
+                    <div class="stat-label">Compression Ratio</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="avgFrameSize">-</div>
+                    <div class="stat-label">Avg Frame Size</div>
                 </div>
             </div>
         </div>
@@ -314,6 +168,7 @@
         
         // Video metadata
         let currentVideoMetadata = null;
+        let userSetFps = false; // Track if user has manually set FPS
 
         const statusElement = document.getElementById('status');
         const frameDisplay = document.getElementById('frameDisplay');
@@ -334,6 +189,27 @@
         const videoFpsElement = document.getElementById('videoFps');
         const videoDurationElement = document.getElementById('videoDuration');
         const videoCodecElement = document.getElementById('videoCodec');
+        
+        // New stats elements
+        const displayFpsActualElement = document.getElementById('displayFpsActual');
+        const totalDataReceivedElement = document.getElementById('totalDataReceived');
+        const avgProducerFpsElement = document.getElementById('avgProducerFps');
+        const compressionRatioElement = document.getElementById('compressionRatio');
+        const avgFrameSizeElement = document.getElementById('avgFrameSize');
+        const connectionStatusElement = document.getElementById('connectionStatus');
+        const uptimeElement = document.getElementById('uptime');
+        const droppedFramesElement = document.getElementById('droppedFrames');
+        const networkLatencyElement = document.getElementById('networkLatency');
+        
+        // Stats tracking variables
+        let sessionStartTime = null;
+        let totalDataReceived = 0;
+        let frameReceiveTimes = [];
+        let frameDisplayTimes = [];
+        let producerFpsHistory = [];
+        let droppedFrameCount = 0;
+        let lastFrameNumber = -1;
+        let uptimeInterval = null;
 
         function updateStatus(message, type) {
             statusElement.textContent = message;
@@ -394,6 +270,9 @@
             
             ws.onopen = function() {
                 updateStatus('Connected - Waiting for frames', 'connected');
+                connectionStatusElement.textContent = 'Connected';
+                sessionStartTime = Date.now();
+                startUptimeCounter();
                 console.log('Connected to server');
             };
             
@@ -406,8 +285,10 @@
                     if (frameData.metadata && !currentVideoMetadata) {
                         currentVideoMetadata = frameData.metadata;
                         updateVideoMetadataDisplay();
-                        // Only auto-set FPS when explicitly requested
-                        // setDisplayFpsFromVideo() is now called only from startConsumer() and restartConsumer()
+                        // Only auto-set FPS if user hasn't manually set it
+                        if (!userSetFps) {
+                            setDisplayFpsFromVideo();
+                        }
                     }
                     
                     // Use queue system
@@ -420,11 +301,14 @@
             
             ws.onclose = function() {
                 updateStatus('Connection closed - Click reconnect to try again', 'error');
+                connectionStatusElement.textContent = 'Disconnected';
+                stopUptimeCounter();
                 console.log('Connection closed');
             };
             
             ws.onerror = function(error) {
                 updateStatus('Connection error - Check if server is running', 'error');
+                connectionStatusElement.textContent = 'Error';
                 console.error('WebSocket error:', error);
             };
         }
@@ -499,13 +383,15 @@
             
             // Set proper dimensions if metadata is available
             if (currentVideoMetadata) {
-                const maxWidth = 800; // Max display width
+                const maxWidth = 450; // Max display width to match container
                 const aspectRatio = currentVideoMetadata.width / currentVideoMetadata.height;
                 const displayWidth = Math.min(maxWidth, currentVideoMetadata.width);
                 const displayHeight = displayWidth / aspectRatio;
                 
-                img.style.width = `${displayWidth}px`;
-                img.style.height = `${displayHeight}px`;
+                // Only set width and let height scale naturally to maintain aspect ratio
+                img.style.maxWidth = `${displayWidth}px`;
+                img.style.height = 'auto';
+                img.style.width = 'auto';
             }
             
             // Update the image source (avoids flicker by reusing same element)
@@ -524,6 +410,41 @@
             const processingTime = processingEndTime - processingStartTime;
             latencyElement.textContent = `${processingTime}ms`;
             
+            // Track data received (estimate based on base64 data length)
+            const frameSize = data.length * 0.75 / 1024 / 1024; // Convert base64 to MB
+            totalDataReceived += frameSize;
+            totalDataReceivedElement.textContent = `${totalDataReceived.toFixed(2)}MB`;
+            
+            // Track frame receive times for receive FPS (keep existing logic)
+            frameReceiveTimes.push(Date.now());
+            if (frameReceiveTimes.length > 60) frameReceiveTimes.shift(); // Keep last 60 frames
+            
+            // Track frame display times for actual display FPS
+            frameDisplayTimes.push(processingEndTime);
+            if (frameDisplayTimes.length > 30) frameDisplayTimes.shift(); // Keep last 30 displays
+            
+            // Calculate actual display FPS
+            if (frameDisplayTimes.length > 1) {
+                const displayTimeSpan = (frameDisplayTimes[frameDisplayTimes.length - 1] - frameDisplayTimes[0]) / 1000;
+                const actualDisplayFps = (frameDisplayTimes.length - 1) / displayTimeSpan;
+                displayFpsActualElement.textContent = actualDisplayFps.toFixed(1);
+            }
+            
+            // Check for dropped frames
+            if (lastFrameNumber >= 0 && frameNumber > lastFrameNumber + 1) {
+                droppedFrameCount += (frameNumber - lastFrameNumber - 1);
+                droppedFramesElement.textContent = droppedFrameCount;
+            }
+            lastFrameNumber = frameNumber;
+            
+            // Calculate compression ratio and average frame size
+            if (currentVideoMetadata) {
+                const uncompressedSize = (currentVideoMetadata.width * currentVideoMetadata.height * 3) / 1024 / 1024; // RGB bytes to MB
+                const compressionRatio = uncompressedSize / frameSize;
+                compressionRatioElement.textContent = `${compressionRatio.toFixed(1)}:1`;
+                avgFrameSizeElement.textContent = `${(frameSize * 1024).toFixed(1)}KB`;
+            }
+            
             // Update queue info
             updateQueueInfo();
             
@@ -533,6 +454,9 @@
         function updateDisplayFps() {
             const input = document.getElementById('displayFps');
             let fps = parseFloat(input.value);
+            
+            // Mark that user has set FPS
+            userSetFps = true;
             
             // Disable unlimited mode when FPS is set
             unlimitedMode = false;
@@ -554,11 +478,13 @@
         function setPresetFps(fps) {
             const input = document.getElementById('displayFps');
             input.value = fps;
+            userSetFps = true; // Mark as user set
             updateDisplayFps();
         }
         
         function setUnlimitedMode() {
             unlimitedMode = true;
+            userSetFps = true; // Mark as user set
             const input = document.getElementById('displayFps');
             input.value = '∞';
             console.log('Unlimited mode enabled - displaying frames as fast as possible');
@@ -596,8 +522,8 @@
             updateStatus('Connecting...', 'connecting');
             connect();
             
-            // Auto-set FPS when starting fresh consumer
-            if (currentVideoMetadata) {
+            // Only auto-set FPS if user hasn't manually set it
+            if (currentVideoMetadata && !userSetFps) {
                 setDisplayFpsFromVideo();
             }
             
@@ -665,6 +591,15 @@
             producerFpsElement.textContent = stats.currentFps.toFixed(1);
             producerFramesElement.textContent = `${stats.framesPublished}/${stats.totalFrames}`;
             producerDataElement.textContent = `${stats.totalDataSent.toFixed(2)}MB`;
+            
+            // Track producer FPS history for average
+            if (stats.currentFps > 0) {
+                producerFpsHistory.push(stats.currentFps);
+                if (producerFpsHistory.length > 20) producerFpsHistory.shift(); // Keep last 20 readings
+                
+                const avgProducerFps = producerFpsHistory.reduce((a, b) => a + b, 0) / producerFpsHistory.length;
+                avgProducerFpsElement.textContent = avgProducerFps.toFixed(1);
+            }
         }
 
         function startProducerStatsPolling() {
@@ -722,6 +657,18 @@
             currentFrameElement.textContent = '-';
             latencyElement.textContent = '-';
             
+            // Reset new stats
+            totalDataReceived = 0;
+            frameReceiveTimes = [];
+            frameDisplayTimes = [];
+            droppedFrameCount = 0;
+            lastFrameNumber = -1;
+            totalDataReceivedElement.textContent = '0MB';
+            displayFpsActualElement.textContent = '0';
+            droppedFramesElement.textContent = '0';
+            compressionRatioElement.textContent = '-';
+            avgFrameSizeElement.textContent = '-';
+            
             // Clear frame queue
             frameQueue = [];
             updateQueueInfo();
@@ -749,8 +696,8 @@
                     // Clear current display and stats
                     clearDisplay();
                     
-                    // Auto-set FPS when restarting consumer (replay or live)
-                    if (currentVideoMetadata) {
+                    // Only auto-set FPS if user hasn't manually set it
+                    if (currentVideoMetadata && !userSetFps) {
                         setDisplayFpsFromVideo();
                     }
                     
@@ -778,7 +725,10 @@
                     const metadata = await response.json();
                     currentVideoMetadata = metadata;
                     updateVideoMetadataDisplay();
-                    setDisplayFpsFromVideo();
+                    // Only auto-set FPS if user hasn't manually set it
+                    if (!userSetFps) {
+                        setDisplayFpsFromVideo();
+                    }
                 } else {
                     console.log('No video metadata available yet');
                 }
@@ -807,9 +757,29 @@
             console.log(`Auto-set display FPS to ${currentVideoMetadata.fps} from video metadata`);
         }
 
+        function startUptimeCounter() {
+            if (uptimeInterval) clearInterval(uptimeInterval);
+            uptimeInterval = setInterval(() => {
+                if (sessionStartTime) {
+                    const uptime = Math.floor((Date.now() - sessionStartTime) / 1000);
+                    const minutes = Math.floor(uptime / 60);
+                    const seconds = uptime % 60;
+                    uptimeElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                }
+            }, 1000);
+        }
+        
+        function stopUptimeCounter() {
+            if (uptimeInterval) {
+                clearInterval(uptimeInterval);
+                uptimeInterval = null;
+            }
+        }
+        
         // Initialize FPS counter but don't auto-connect
         fpsInterval = setInterval(updateFPS, 1000);
         updateStatus('Ready - Click "Start Consumer" to begin', 'connecting');
+        connectionStatusElement.textContent = 'Ready';
         
         // Fetch initial producer stats and video metadata
         fetchProducerStats();
@@ -830,6 +800,7 @@
                 ws.close();
             }
             clearInterval(fpsInterval);
+            stopUptimeCounter();
             if (producerStatsInterval) {
                 clearInterval(producerStatsInterval);
             }
