@@ -21,7 +21,6 @@ const frameDisplay = document.getElementById('frameDisplay');
 const frameCountElement = document.getElementById('frameCount');
 const fpsElement = document.getElementById('fps');
 const currentFrameElement = document.getElementById('currentFrame');
-const latencyElement = document.getElementById('latency');
 
 // Producer stats elements
 const producerStatusElement = document.getElementById('producerStatus');
@@ -34,7 +33,6 @@ const videoFpsElement = document.getElementById('videoFps');
 const videoDurationElement = document.getElementById('videoDuration');
 const videoCodecElement = document.getElementById('videoCodec');
 
-// New stats elements
 const displayFpsActualElement = document.getElementById('displayFpsActual');
 const totalDataReceivedElement = document.getElementById('totalDataReceived');
 const avgProducerFpsElement = document.getElementById('avgProducerFps');
@@ -82,11 +80,10 @@ function connect() {
     ws.onmessage = function(event) {
         try {
             const frameData = JSON.parse(event.data);
-            // Handle video metadata from first frame
-            if (frameData.metadata && !currentVideoMetadata) {
+            // Handle video metadata from first frame (or updated on re-publish)
+            if (frameData.metadata) {
                 currentVideoMetadata = frameData.metadata;
                 updateVideoMetadataDisplay();
-                // Only auto-set FPS if user hasn't manually set it
                 if (!userSetFps) {
                     setDisplayFpsFromVideo();
                 }
@@ -157,7 +154,7 @@ function displayLoop(timestamp) {
         // Drain the entire queue each tick — ack all, render the last
         while (frameQueue.length > 0) {
             const frameData = frameQueue.shift();
-            frameData.processingStartTime = performance.now();
+
             actuallyDisplayFrame(frameData);
         }
     } else {
@@ -188,7 +185,7 @@ function stopDisplayLoop() {
 }
 
 function actuallyDisplayFrame(frameData) {
-    const { frameNumber, timestamp, data, mimeType, receivedAt, processingStartTime } = frameData;
+    const { frameNumber, data, mimeType } = frameData;
 
     // Hide placeholder text if it exists
     const placeholder = frameDisplay.querySelector('.placeholder');
@@ -224,10 +221,6 @@ function actuallyDisplayFrame(frameData) {
     fpsCounter++;
     frameCountElement.textContent = frameCount;
     currentFrameElement.textContent = frameNumber;
-
-    // Calculate actual processing time (excluding FPS delay)
-    const processingTime = processingEndTime - processingStartTime;
-    latencyElement.textContent = `${processingTime}ms`;
 
     // Track data received (estimate based on base64 data length)
     const frameSize = data.length * 0.75 / 1024 / 1024; // Convert base64 to MB
@@ -435,7 +428,7 @@ async function fetchProducerStats() {
 
 function updateProducerStats(stats) {
     producerStatusElement.textContent = stats.isRunning ? 'Running' : 'Idle';
-    producerStatusElement.parentElement.style.backgroundColor = stats.isRunning ? '#d4edda' : '#f8f9fa';
+    producerStatusElement.parentElement.style.backgroundColor = stats.isRunning ? '#1b5e20' : '';
 
     // Toggle buttons based on producer state
     document.getElementById('runProducerBtn').disabled = stats.isRunning;
@@ -472,7 +465,6 @@ function clearDisplay() {
     frameCountElement.textContent = '0';
     fpsElement.textContent = '0';
     currentFrameElement.textContent = '-';
-    latencyElement.textContent = '-';
 
     // Reset new stats
     totalDataReceived = 0;
@@ -553,8 +545,6 @@ function updateVideoMetadataDisplay() {
     videoFpsElement.textContent = `${currentVideoMetadata.fps.toFixed(1)}`;
     videoDurationElement.textContent = `${currentVideoMetadata.duration.toFixed(1)}s`;
     videoCodecElement.textContent = currentVideoMetadata.codec;
-
-    setDisplaySizeFromVideo();
 }
 
 function setDisplayFpsFromVideo() {
@@ -612,25 +602,6 @@ function setDisplaySize(sizeId) {
     }
 }
 
-function clearDisplaySize() {
-    activeSizeId = null;
-    const img = frameDisplay.querySelector('img');
-    if (img) {
-        img.style.height = 'auto';
-        img.style.width = '';
-        img.style.maxWidth = '100%';
-    }
-    frameDisplay.style.maxWidth = '';
-    for (const id of Object.keys(sizePresets)) {
-        document.getElementById(id).classList.remove('active');
-    }
-}
-
-function setDisplaySizeFromVideo() {
-    if (!currentVideoMetadata) return;
-    if (activeSizeId) return;
-    frameDisplay.style.maxWidth = currentVideoMetadata.width + 'px';
-}
 
 // --- Event listeners ---
 

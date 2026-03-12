@@ -189,7 +189,11 @@ wss.on('connection', async (ws) => {
   });
 
   // Start consuming frames when first client connects
-  await startConsumingIfClients();
+  try {
+    await startConsumingIfClients();
+  } catch (error) {
+    console.error('Failed to start consuming:', error.message);
+  }
 
   ws.on('close', () => {
     console.log('Client disconnected');
@@ -216,43 +220,7 @@ class FrameConsumer {
       this.channel = await this.connection.createChannel();
       await this.channel.prefetch(50);
 
-      // Try to check if queue exists first to get metadata
-      let queueExists = false;
-      try {
-        const queueInfo = await this.channel.checkQueue(QUEUE_NAME);
-        queueExists = true;
-        
-        if (queueInfo && queueInfo.arguments) {
-          const args = queueInfo.arguments;
-          if (args['x-video-width'] && args['x-video-height']) {
-            currentVideoMetadata = {
-              width: parseInt(args['x-video-width']),
-              height: parseInt(args['x-video-height']),
-              fps: parseFloat(args['x-video-fps']),
-              duration: parseFloat(args['x-video-duration']),
-              codec: args['x-video-codec'],
-              bitrate: args['x-video-bitrate'] ? parseInt(args['x-video-bitrate']) : null
-            };
-            console.log('📹 Retrieved video metadata from existing queue:', currentVideoMetadata);
-          }
-        }
-      } catch (error) {
-        // Queue doesn't exist yet
-        console.log('Queue does not exist yet, will be created by producer');
-      }
-      
-      // Only assert queue if it doesn't exist (let producer create it with metadata)
-      if (!queueExists) {
-        await this.channel.assertQueue(QUEUE_NAME, { 
-          durable: true,
-          arguments: {
-            'x-queue-type': 'stream',
-          }
-        });
-        console.log('Created basic stream queue (producer will add metadata)');
-      }
-      
-      console.log('Connected to LavinMQ with stream queue');
+      console.log('Connected to LavinMQ');
     } catch (error) {
       console.error('Failed to connect to LavinMQ:', error.message);
       throw error;
@@ -274,10 +242,9 @@ class FrameConsumer {
         try {
           const frameData = JSON.parse(message.content.toString());
           
-          // Store video metadata from first frame
-          if (frameData.metadata && !currentVideoMetadata) {
+          // Store video metadata from first frame (or updated on re-publish)
+          if (frameData.metadata) {
             currentVideoMetadata = frameData.metadata;
-            console.log('📹 Stored video metadata:', currentVideoMetadata);
           }
           
           const jsonMessage = JSON.stringify({
@@ -310,8 +277,10 @@ class FrameConsumer {
 
 
   async close() {
-    if (this.channel) await this.channel.close();
-    if (this.connection) await this.connection.close();
+    try { if (this.channel) await this.channel.close(); } catch (e) { /* already closed */ }
+    try { if (this.connection) await this.connection.close(); } catch (e) { /* already closed */ }
+    this.channel = null;
+    this.connection = null;
   }
 }
 

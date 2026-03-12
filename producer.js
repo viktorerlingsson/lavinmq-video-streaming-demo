@@ -17,14 +17,14 @@ class VideoFrameProducer {
     try {
       this.connection = await amqp.connect(this.lavinMQUrl);
       this.channel = await this.connection.createChannel();
-      
+
       // Delete existing queue to ensure clean slate with correct metadata
       try {
         await this.channel.deleteQueue(this.queueName);
         console.log('Deleted existing queue to refresh metadata');
       } catch (error) {
-        // Queue might not exist, which is fine
-        console.log('No existing queue to delete');
+        // deleteQueue failure closes the channel in AMQP — recreate it
+        this.channel = await this.connection.createChannel();
       }
       
       // Configure as stream queue for replay capability
@@ -152,16 +152,14 @@ class VideoFrameProducer {
                 metadata: metadata
               };
               
-              // Serialize as JSON for now (can optimize further later)
               const messageBuffer = Buffer.from(JSON.stringify(frameMessage));
               stats.totalDataSent += messageBuffer.length;
               
-              await this.channel.sendToQueue(
+              this.channel.sendToQueue(
                 this.queueName,
                 messageBuffer,
-                { 
+                {
                   persistent: true,
-                  // Add message properties for stream replay
                   messageId: `frame_${i}`,
                   timestamp: Date.now()
                 }
