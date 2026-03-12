@@ -14,7 +14,7 @@ let isPlaying = false;
 
 // Video metadata
 let currentVideoMetadata = null;
-let userSetFps = false; // Track if user has manually set FPS
+let userSetFps = false;
 
 const statusElement = document.getElementById('status');
 const frameDisplay = document.getElementById('frameDisplay');
@@ -492,10 +492,6 @@ async function seekTo(offset) {
     }
 }
 
-function rewindToStart() {
-    seekTo('first');
-}
-
 function seekRelative(seconds) {
     const fps = currentVideoMetadata ? currentVideoMetadata.fps : 10;
     const frameOffset = Math.round(seconds * fps);
@@ -591,7 +587,7 @@ document.getElementById('playPauseBtn').addEventListener('click', togglePlayPaus
 document.getElementById('runProducerBtn').addEventListener('click', runProducer);
 document.getElementById('stopProducerBtn').addEventListener('click', stopProducer);
 document.getElementById('clearBtn').addEventListener('click', clearDisplay);
-document.getElementById('rewindAllBtn').addEventListener('click', rewindToStart);
+document.getElementById('rewindAllBtn').addEventListener('click', () => seekTo('first'));
 document.getElementById('rewind5Btn').addEventListener('click', () => seekRelative(-5));
 document.getElementById('forward5Btn').addEventListener('click', () => seekRelative(5));
 document.getElementById('forwardEndBtn').addEventListener('click', () => seekTo('last'));

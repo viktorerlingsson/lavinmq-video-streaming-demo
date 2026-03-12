@@ -52,11 +52,8 @@ app.post('/api/run-producer', (req, res) => {
     });
   }
   
-  const videoPath = SAMPLE_VIDEO_PATH;
-  
   console.log('Starting producer process...');
-  
-  // Reset stats
+
   currentProducerStats = {
     isRunning: true,
     startTime: Date.now(),
@@ -64,8 +61,8 @@ app.post('/api/run-producer', (req, res) => {
     totalDataSent: 0,
     avgPublishFps: 0
   };
-  
-  producerProcess = spawn('node', ['producer.js', videoPath, LAVINMQ_URL], {
+
+  producerProcess = spawn('node', ['producer.js', SAMPLE_VIDEO_PATH, LAVINMQ_URL], {
     cwd: __dirname,
     stdio: 'pipe'
   });
@@ -282,7 +279,6 @@ class FrameConsumer {
     console.log('Started consuming frames from LavinMQ stream');
   }
 
-
   async close() {
     try { if (this.channel) await this.channel.close(); } catch (e) { /* already closed */ }
     try { if (this.connection) await this.connection.close(); } catch (e) { /* already closed */ }
@@ -327,7 +323,6 @@ async function startServer() {
       console.log(`Server running on http://localhost:${PORT}`);
       console.log('Ready for WebSocket connections...');
     });
-
   } catch (error) {
     console.error('Failed to start server:', error.message);
     process.exit(1);
