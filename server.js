@@ -8,11 +8,14 @@ const { spawn } = require('child_process');
 
 const app = express();
 const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+const wss = new WebSocket.Server({ server, path: '/ws' });
 
 const PORT = process.env.PORT || 3000;
+const fs = require('fs');
 const LAVINMQ_URL = process.env.LAVINMQ_URL || 'amqp://localhost:5672';
 const QUEUE_NAME = 'video_frames';
+const SAMPLE_VIDEO_PATH = path.join(__dirname, 'sample-video.mp4');
+const SAMPLE_VIDEO_URL = process.env.SAMPLE_VIDEO_URL || 'https://lavinmq-demos.s3.us-east-2.amazonaws.com/video-demo/sample_video.mp4';
 
 // Global producer stats storage
 let currentProducerStats = {
@@ -29,11 +32,13 @@ let currentVideoMetadata = null;
 // Current producer child process
 let producerProcess = null;
 
-app.use(express.static(__dirname));
 app.use(express.json());
 
+// Serve built frontend in production
+const distPath = path.join(__dirname, 'dist');
+app.use(express.static(distPath));
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
+  res.sendFile(path.join(distPath, 'index.html'));
 });
 
 // API endpoint to run producer
@@ -45,7 +50,7 @@ app.post('/api/run-producer', (req, res) => {
     });
   }
   
-  const videoPath = path.join(__dirname, 'sample-video.mp4');
+  const videoPath = SAMPLE_VIDEO_PATH;
   
   console.log('Starting producer process...');
   
@@ -297,13 +302,32 @@ async function startConsumingIfClients() {
   }
 }
 
+async function ensureSampleVideo() {
+  if (fs.existsSync(SAMPLE_VIDEO_PATH)) return;
+  if (!SAMPLE_VIDEO_URL) {
+    console.log('No sample-video.mp4 found. Set SAMPLE_VIDEO_URL in .env to auto-download.');
+    return;
+  }
+  console.log(`Downloading sample video from ${SAMPLE_VIDEO_URL}...`);
+  const { pipeline } = require('stream/promises');
+  const response = await fetch(SAMPLE_VIDEO_URL);
+  if (!response.ok) {
+    console.error(`Failed to download sample video: ${response.status}`);
+    return;
+  }
+  const { Readable } = require('stream');
+  await pipeline(Readable.fromWeb(response.body), fs.createWriteStream(SAMPLE_VIDEO_PATH));
+  console.log('Sample video downloaded.');
+}
+
 async function startServer() {
+  await ensureSampleVideo();
   try {
     server.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`);
       console.log('Ready for WebSocket connections...');
     });
-    
+
   } catch (error) {
     console.error('Failed to start server:', error.message);
     process.exit(1);

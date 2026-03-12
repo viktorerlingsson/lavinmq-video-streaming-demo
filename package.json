@@ -2,11 +2,14 @@
   "name": "lavinmq-video-streaming-demo",
   "version": "1.0.0",
   "description": "Demo app that streams video frames through LavinMQ",
-  "main": "producer.js",
+  "main": "server.js",
   "scripts": {
-    "producer": "node producer.js",
-    "consumer": "node server.js",
-    "start": "node server.js"
+    "dev": "concurrently \"PORT=3001 node server.js\" \"vite\"",
+    "build": "vite build",
+    "preview": "vite preview",
+    "server": "node server.js",
+    "start": "node server.js",
+    "producer": "node producer.js"
   },
   "dependencies": {
     "amqplib": "^0.10.3",
@@ -17,7 +20,9 @@
     "ws": "^8.14.2"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1"
+    "concurrently": "^9.2.1",
+    "nodemon": "^3.0.1",
+    "vite": "^7.3.1"
   },
   "keywords": [
     "lavinmq",
