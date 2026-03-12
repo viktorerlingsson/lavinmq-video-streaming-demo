@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const amqp = require('amqplib');
 const path = require('path');
@@ -17,17 +18,16 @@ const QUEUE_NAME = 'video_frames';
 let currentProducerStats = {
   isRunning: false,
   startTime: null,
-  progress: 0,
-  currentFps: 0,
   framesPublished: 0,
-  totalFrames: 0,
   totalDataSent: 0,
-  extractionTime: 0,
-  publishingTime: 0
+  avgPublishFps: 0
 };
 
 // Store video metadata for clients
 let currentVideoMetadata = null;
+
+// Current producer child process
+let producerProcess = null;
 
 app.use(express.static(__dirname));
 app.use(express.json());
@@ -53,52 +53,42 @@ app.post('/api/run-producer', (req, res) => {
   currentProducerStats = {
     isRunning: true,
     startTime: Date.now(),
-    progress: 0,
-    currentFps: 0,
     framesPublished: 0,
-    totalFrames: 0,
     totalDataSent: 0,
-    extractionTime: 0,
-    publishingTime: 0
+    avgPublishFps: 0
   };
   
-  const producer = spawn('node', ['producer.js', videoPath], {
+  producerProcess = spawn('node', ['producer.js', videoPath, LAVINMQ_URL], {
     cwd: __dirname,
     stdio: 'pipe'
   });
-  
-  let output = '';
-  let errorOutput = '';
-  
-  producer.stdout.on('data', (data) => {
+
+  producerProcess.stdout.on('data', (data) => {
     const message = data.toString();
-    output += message;
     console.log(`Producer: ${message.trim()}`);
-    
-    // Parse stats from producer output
     parseProducerStats(message);
   });
-  
-  producer.stderr.on('data', (data) => {
-    const message = data.toString();
-    errorOutput += message;
-    console.error(`Producer Error: ${message.trim()}`);
+
+  producerProcess.stderr.on('data', (data) => {
+    console.error(`Producer Error: ${data.toString().trim()}`);
   });
-  
-  producer.on('close', (code) => {
+
+  producerProcess.on('close', (code) => {
     console.log(`Producer process exited with code ${code}`);
     currentProducerStats.isRunning = false;
-    
+    producerProcess = null;
+
     if (code === 0) {
       console.log('Producer completed successfully');
     } else {
       console.error('Producer failed');
     }
   });
-  
-  producer.on('error', (error) => {
+
+  producerProcess.on('error', (error) => {
     console.error('Failed to start producer:', error.message);
     currentProducerStats.isRunning = false;
+    producerProcess = null;
   });
   
   // Return immediately with success response
@@ -107,6 +97,16 @@ app.post('/api/run-producer', (req, res) => {
     message: 'Producer started in background',
     videoPath: videoPath
   });
+});
+
+// API endpoint to stop producer
+app.post('/api/stop-producer', (req, res) => {
+  if (!producerProcess) {
+    return res.status(400).json({ success: false, error: 'Producer is not running' });
+  }
+
+  producerProcess.kill('SIGTERM');
+  res.json({ success: true, message: 'Producer stopped' });
 });
 
 // API endpoint to get producer stats
@@ -128,86 +128,75 @@ app.get('/api/video-metadata', (req, res) => {
 
 // API endpoint to restart consumer with replay option
 app.post('/api/restart-consumer', async (req, res) => {
-  const { fromBeginning = true } = req.body;
-  
+  const { offset } = req.body;
+
   try {
-    // Stop current consumer
     if (isConsuming) {
-      await consumer.close();
+      try { await consumer.close(); } catch (e) { /* may already be closed */ }
       isConsuming = false;
     }
-    
-    // Reconnect and start consuming with specified mode
+
     await consumer.connect();
-    await consumer.startConsuming(fromBeginning);
+    await consumer.startConsuming(offset);
     isConsuming = true;
-    
-    res.json({
-      success: true,
-      message: `Consumer restarted ${fromBeginning ? 'from beginning (replay mode)' : 'from next message (live mode)'}`,
-      mode: fromBeginning ? 'replay' : 'live'
-    });
-    
+
+    res.json({ success: true, offset });
   } catch (error) {
     console.error('Failed to restart consumer:', error.message);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
 // Parse stats from producer console output
 function parseProducerStats(message) {
-  try {
-    // Parse progress updates
-    const progressMatch = message.match(/Progress: ([\d.]+)%.*Publishing FPS: ([\d.]+)/);
-    if (progressMatch) {
-      currentProducerStats.progress = parseFloat(progressMatch[1]);
-      currentProducerStats.currentFps = parseFloat(progressMatch[2]);
+  // Look for structured STATS: lines from producer
+  const lines = message.split('\n');
+  for (const line of lines) {
+    if (!line.startsWith('STATS:')) continue;
+    try {
+      const stats = JSON.parse(line.slice(6));
+      if (stats.type === 'complete') {
+          currentProducerStats.framesPublished = stats.framesPublished;
+          currentProducerStats.totalDataSent = stats.totalDataSent;
+          currentProducerStats.avgPublishFps = stats.avgPublishFps;
+      }
+    } catch (error) {
+      // Ignore malformed lines
     }
-    
-    // Parse extraction stats
-    const extractionMatch = message.match(/Frames extracted: (\d+)/);
-    if (extractionMatch) {
-      currentProducerStats.totalFrames = parseInt(extractionMatch[1]);
-    }
-    
-    const extractionTimeMatch = message.match(/Extraction time: ([\d.]+)s/);
-    if (extractionTimeMatch) {
-      currentProducerStats.extractionTime = parseFloat(extractionTimeMatch[1]);
-    }
-    
-    // Parse final stats
-    const publishingTimeMatch = message.match(/Publishing time: ([\d.]+)s/);
-    if (publishingTimeMatch) {
-      currentProducerStats.publishingTime = parseFloat(publishingTimeMatch[1]);
-    }
-    
-    const framesPublishedMatch = message.match(/Frames published: (\d+)\/(\d+)/);
-    if (framesPublishedMatch) {
-      currentProducerStats.framesPublished = parseInt(framesPublishedMatch[1]);
-    }
-    
-    const totalDataMatch = message.match(/Total data published: ([\d.]+)MB/);
-    if (totalDataMatch) {
-      currentProducerStats.totalDataSent = parseFloat(totalDataMatch[1]);
-    }
-    
-  } catch (error) {
-    // Ignore parsing errors
   }
 }
+
+// Map of frameNumber -> AMQP message, awaiting client ack
+let unackedMessages = new Map();
 
 // WebSocket connection handler
 wss.on('connection', async (ws) => {
   console.log('Client connected');
-  
+
+  ws.on('message', (data) => {
+    try {
+      const msg = JSON.parse(data);
+      if (msg.type === 'ack' && msg.frameNumber != null) {
+        const entry = unackedMessages.get(msg.frameNumber);
+        if (entry) {
+          entry.channel.ack(entry.message);
+          unackedMessages.delete(msg.frameNumber);
+        }
+      }
+    } catch (error) {
+      // Ignore malformed messages
+    }
+  });
+
   // Start consuming frames when first client connects
   await startConsumingIfClients();
-  
+
   ws.on('close', () => {
     console.log('Client disconnected');
+    for (const { message, channel } of unackedMessages.values()) {
+      try { channel.nack(message, false, true); } catch (e) { /* channel may be closed */ }
+    }
+    unackedMessages.clear();
   });
 });
 
@@ -222,8 +211,11 @@ class FrameConsumer {
   async connect() {
     try {
       this.connection = await amqp.connect(this.lavinMQUrl);
+      this.connection.on('error', () => { isConsuming = false; });
+      this.connection.on('close', () => { isConsuming = false; });
       this.channel = await this.connection.createChannel();
-      
+      await this.channel.prefetch(50);
+
       // Try to check if queue exists first to get metadata
       let queueExists = false;
       try {
@@ -267,16 +259,13 @@ class FrameConsumer {
     }
   }
 
-  async startConsuming(fromBeginning = true) {
-    console.log(`Starting to consume from queue: ${QUEUE_NAME}${fromBeginning ? ' (from beginning for replay)' : ''}`);
-    
-    // Configure consumer options for stream replay
+  async startConsuming(offset = 'first') {
+    console.log(`Starting to consume from queue: ${QUEUE_NAME} (offset: ${offset})`);
+
     const consumeOptions = {
       noAck: false,
-      arguments: fromBeginning ? {
-        'x-stream-offset': 'first' // Start from beginning for replay capability
-      } : {
-        'x-stream-offset': 'next' // Start from next message for live streaming
+      arguments: {
+        'x-stream-offset': offset
       }
     };
     
@@ -291,9 +280,6 @@ class FrameConsumer {
             console.log('📹 Stored video metadata:', currentVideoMetadata);
           }
           
-          console.log(`Received frame ${frameData.frameNumber}, WebSocket clients: ${wss.clients.size}`);
-          
-          // For now, send as JSON to debug (will optimize to binary later)
           const jsonMessage = JSON.stringify({
             frameNumber: frameData.frameNumber,
             timestamp: frameData.timestamp,
@@ -302,17 +288,15 @@ class FrameConsumer {
             metadata: frameData.metadata
           });
           
-          // Broadcast frame to all connected WebSocket clients
+          // Hold message until client acks after display
+          unackedMessages.set(frameData.frameNumber, { message, channel: this.channel });
+
+          // Broadcast to all connected WebSocket clients
           wss.clients.forEach((client) => {
             if (client.readyState === WebSocket.OPEN) {
               client.send(jsonMessage);
-              console.log(`Sent frame ${frameData.frameNumber} to WebSocket client`);
             }
           });
-          
-          console.log(`Broadcasted frame ${frameData.frameNumber}`);
-          
-          this.channel.ack(message);
           
         } catch (error) {
           console.error('Error processing message:', error.message);
@@ -324,37 +308,6 @@ class FrameConsumer {
     console.log('Started consuming frames from LavinMQ stream');
   }
 
-  createBinaryMessage(frameData) {
-    // Create efficient binary message format
-    // Structure: [Header][Image Data]
-    // Header: frameNumber(4) + timestamp(8) + mimeTypeLength(1) + mimeType + metadataLength(4) + metadata
-    
-    const imageBuffer = Buffer.from(frameData.imageData, 'base64');
-    const mimeTypeBuffer = Buffer.from(frameData.mimeType, 'utf8');
-    const metadataBuffer = frameData.metadata ? Buffer.from(JSON.stringify(frameData.metadata), 'utf8') : Buffer.alloc(0);
-    
-    // Calculate total size
-    const headerSize = 4 + 8 + 1 + mimeTypeBuffer.length + 4 + metadataBuffer.length;
-    const totalSize = headerSize + imageBuffer.length;
-    
-    const binaryMessage = Buffer.allocUnsafe(totalSize);
-    let offset = 0;
-    
-    // Write header
-    binaryMessage.writeUInt32LE(frameData.frameNumber, offset); offset += 4;
-    binaryMessage.writeBigUInt64LE(BigInt(frameData.timestamp), offset); offset += 8;
-    binaryMessage.writeUInt8(mimeTypeBuffer.length, offset); offset += 1;
-    mimeTypeBuffer.copy(binaryMessage, offset); offset += mimeTypeBuffer.length;
-    binaryMessage.writeUInt32LE(metadataBuffer.length, offset); offset += 4;
-    if (metadataBuffer.length > 0) {
-      metadataBuffer.copy(binaryMessage, offset); offset += metadataBuffer.length;
-    }
-    
-    // Write image data
-    imageBuffer.copy(binaryMessage, offset);
-    
-    return binaryMessage;
-  }
 
   async close() {
     if (this.channel) await this.channel.close();

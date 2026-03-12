@@ -1,3 +1,4 @@
+require('dotenv').config();
 const amqp = require('amqplib');
 const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs-extra');
@@ -74,7 +75,7 @@ class VideoFrameProducer {
           duration: parseFloat(metadata.format.duration),
           width: videoStream.width,
           height: videoStream.height,
-          fps: eval(videoStream.r_frame_rate), // Parse fraction like "30/1"
+          fps: videoStream.r_frame_rate.split('/').reduce((a, b) => a / b),
           codec: videoStream.codec_name,
           bitrate: metadata.format.bit_rate ? parseInt(metadata.format.bit_rate) : null
         };
@@ -117,7 +118,7 @@ class VideoFrameProducer {
       
       ffmpeg(this.videoPath)
         .outputOptions([
-          '-vf fps=10', // Extract 10 frames per second
+          `-vf fps=${videoMetadata.fps}`,
           '-f image2',
           '-vcodec mjpeg',
           '-q:v 3' // High quality JPEG (1-31, lower = better quality)
@@ -128,27 +129,20 @@ class VideoFrameProducer {
           stats.totalFrames = frameCount;
           
           const extractionTime = (stats.extractionEndTime - stats.extractionStartTime) / 1000;
-          console.log(`📊 EXTRACTION STATS:`);
-          console.log(`   Frames extracted: ${frameCount}`);
-          console.log(`   Extraction time: ${extractionTime.toFixed(2)}s`);
-          console.log(`   Extraction FPS: ${(frameCount / extractionTime).toFixed(1)}`);
+          console.log(`STATS:${JSON.stringify({ type: 'extraction', totalFrames: frameCount, extractionTime })}`);
           
           try {
             const frameFiles = await fs.readdir(tempDir);
             frameFiles.sort();
             
             stats.publishingStartTime = Date.now();
-            console.log('\n📡 PUBLISHING STATS:');
-            
+
             let publishedCount = 0;
-            let publishFpsCounter = 0;
-            let lastPublishFpsTime = Date.now();
             
             for (let i = 0; i < frameFiles.length; i++) {
               const framePath = path.join(tempDir, frameFiles[i]);
               const frameBuffer = await fs.readFile(framePath);
               
-              // Create message with base64 encoded image (for JSON compatibility with current server)
               const metadata = i === 0 ? videoMetadata : null;
               const frameMessage = {
                 frameNumber: i,
@@ -174,24 +168,7 @@ class VideoFrameProducer {
               );
               
               publishedCount++;
-              publishFpsCounter++;
               stats.framesPublished = publishedCount;
-              
-              // Calculate and display real-time stats every 10 frames
-              if (i > 0 && (i + 1) % 10 === 0) {
-                const now = Date.now();
-                const timeDiff = (now - lastPublishFpsTime) / 1000;
-                const currentFps = publishFpsCounter / timeDiff;
-                const progress = ((i + 1) / frameFiles.length * 100).toFixed(1);
-                const avgDataPerFrame = (stats.totalDataSent / publishedCount / 1024).toFixed(1);
-                
-                console.log(`   Progress: ${progress}% (${i + 1}/${frameFiles.length}) | Publishing FPS: ${currentFps.toFixed(1)} | Avg frame size: ${avgDataPerFrame}KB`);
-                
-                publishFpsCounter = 0;
-                lastPublishFpsTime = now;
-              }
-              
-              // No delay - publish as fast as possible
             }
             
             stats.publishingEndTime = Date.now();
@@ -201,15 +178,7 @@ class VideoFrameProducer {
             const publishTime = (stats.publishingEndTime - stats.publishingStartTime) / 1000;
             const avgPublishFps = stats.framesPublished / publishTime;
             const totalDataMB = (stats.totalDataSent / 1024 / 1024).toFixed(2);
-            const avgFrameSizeKB = (stats.totalDataSent / stats.framesPublished / 1024).toFixed(1);
-            
-            console.log(`\n🎯 FINAL STATS:`);
-            console.log(`   Total time: ${totalTime.toFixed(2)}s`);
-            console.log(`   Publishing time: ${publishTime.toFixed(2)}s`);
-            console.log(`   Average publishing FPS: ${avgPublishFps.toFixed(1)}`);
-            console.log(`   Total data published: ${totalDataMB}MB`);
-            console.log(`   Average frame size: ${avgFrameSizeKB}KB`);
-            console.log(`   Frames published: ${stats.framesPublished}/${stats.totalFrames}`);
+            console.log(`STATS:${JSON.stringify({ type: 'complete', totalTime, publishingTime: publishTime, avgPublishFps, totalDataSent: parseFloat(totalDataMB), framesPublished: stats.framesPublished, totalFrames: stats.totalFrames })}`);
             
             // Cleanup temp files
             await fs.remove(tempDir);
@@ -248,7 +217,7 @@ class VideoFrameProducer {
 // Main execution
 async function main() {
   const videoPath = process.argv[2] || './sample-video.mp4';
-  const lavinMQUrl = process.argv[3] || 'amqp://localhost:5672';
+  const lavinMQUrl = process.argv[3] || process.env.LAVINMQ_URL || 'amqp://localhost:5672';
 
   if (!fs.existsSync(videoPath)) {
     console.error('Error: Video file not found:', videoPath);

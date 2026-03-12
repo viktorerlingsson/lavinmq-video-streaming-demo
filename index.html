@@ -8,806 +8,172 @@
 </head>
 <body>
     <div class="container">
-        <h1>🚀 LavinMQ Video Streaming Demo</h1>
-        
-        <div id="status" class="status connecting">Ready - Click "Start Consumer" to begin</div>
-        
+        <h1>LavinMQ Video Streaming Demo</h1>
+
+        <div id="status" class="status connecting">Connected - Paused</div>
+
         <div class="video-container">
             <div id="frameDisplay">
                 <div class="placeholder">Waiting for video frames...</div>
             </div>
         </div>
-        
-        <div class="controls">
-            <button id="startBtn" class="primary" onclick="startConsumer()">Start Consumer</button>
-            <button id="stopBtn" class="secondary" onclick="stopConsumer()" disabled>Stop Consumer</button>
-            <button id="runProducerBtn" class="primary" onclick="runProducer()">Run Producer</button>
-            <button id="clearBtn" class="secondary" onclick="clearDisplay()">Clear</button>
-        </div>
-        
-        <div class="speed-controls">
-            <label>Stream Mode:</label>
-            <button onclick="restartConsumer(true)" class="primary">Replay from Beginning</button>
-            <button onclick="restartConsumer(false)" class="secondary">Live Stream</button>
-            <span id="streamMode">Mode: Live</span>
-        </div>
-        
-        <div class="speed-controls">
-            <label for="displayFps">Display FPS:</label>
-            <input type="number" id="displayFps" value="5" min="0.1" max="60" step="0.1" onchange="updateDisplayFps()">
-            <button onclick="setPresetFps(1)" class="secondary">1 FPS</button>
-            <button onclick="setPresetFps(5)" class="secondary">5 FPS</button>
-            <button onclick="setPresetFps(10)" class="secondary">10 FPS</button>
-            <button onclick="setPresetFps(30)" class="secondary">30 FPS</button>
-            <button onclick="setUnlimitedMode()" class="primary">Unlimited</button>
-            <span id="queueInfo">Queue: 0 frames</span>
-        </div>
-        
-        <div class="stats">
-            <h3>📡 Consumer Stats</h3>
-            <div class="stat-grid">
-                <div class="stat-card">
-                    <div class="stat-value" id="frameCount">0</div>
-                    <div class="stat-label">Frames Received</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="fps">0</div>
-                    <div class="stat-label">Receive FPS</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="currentFrame">-</div>
-                    <div class="stat-label">Current Frame</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="latency">-</div>
-                    <div class="stat-label">Processing Time (ms)</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="displayFpsActual">0</div>
-                    <div class="stat-label">Display FPS</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="totalDataReceived">0MB</div>
-                    <div class="stat-label">Data Received</div>
-                </div>
+
+        <div class="transport-bar">
+            <div class="transport-controls">
+                <button id="rewindAllBtn" class="transport-btn" title="Rewind to start">&#9198;</button>
+                <button id="rewind5Btn" class="transport-btn" title="Rewind 5s">&#9194;</button>
+                <button id="playPauseBtn" class="transport-btn play-pause" title="Play">&#9654;</button>
+                <button id="forward5Btn" class="transport-btn" title="Forward 5s">&#9193;</button>
+                <button id="forwardEndBtn" class="transport-btn" title="Forward to end">&#9197;</button>
             </div>
-            
-            <h3>🎬 Producer Stats</h3>
-            <div class="stat-grid">
-                <div class="stat-card">
-                    <div class="stat-value" id="producerStatus">Idle</div>
-                    <div class="stat-label">Status</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="producerProgress">0%</div>
-                    <div class="stat-label">Progress</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="producerFps">0</div>
-                    <div class="stat-label">Publish FPS</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="producerFrames">0/0</div>
-                    <div class="stat-label">Frames Published</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="producerData">0MB</div>
-                    <div class="stat-label">Data Sent</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="avgProducerFps">-</div>
-                    <div class="stat-label">Average Publish FPS</div>
-                </div>
+            <div class="video-time" id="videoTime">0.0s / -</div>
+        </div>
+
+        <div class="options-bar">
+            <div class="option-group">
+                <span class="option-label">Speed</span>
+                <button id="presetSlow50" class="option-btn">0.5x</button>
+                <button id="presetSlow75" class="option-btn">0.75x</button>
+                <button id="presetNormal" class="option-btn active">1x</button>
+                <button id="presetFast150" class="option-btn">1.5x</button>
+                <button id="presetFast200" class="option-btn">2x</button>
+                <button id="unlimitedBtn" class="option-btn">Max</button>
             </div>
-            
-            <h3>🔗 Network & Performance</h3>
-            <div class="stat-grid">
-                <div class="stat-card">
-                    <div class="stat-value" id="connectionStatus">-</div>
-                    <div class="stat-label">Connection</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="uptime">0s</div>
-                    <div class="stat-label">Uptime</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="droppedFrames">0</div>
-                    <div class="stat-label">Dropped Frames</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="networkLatency">-</div>
-                    <div class="stat-label">Network Latency (ms)</div>
-                </div>
-            </div>
-            
-            <h3>📹 Video Info</h3>
-            <div class="stat-grid">
-                <div class="stat-card">
-                    <div class="stat-value" id="videoResolution">-</div>
-                    <div class="stat-label">Resolution</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="videoFps">-</div>
-                    <div class="stat-label">Original FPS</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="videoDuration">-</div>
-                    <div class="stat-label">Duration</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="videoCodec">-</div>
-                    <div class="stat-label">Codec</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="compressionRatio">-</div>
-                    <div class="stat-label">Compression Ratio</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="avgFrameSize">-</div>
-                    <div class="stat-label">Avg Frame Size</div>
-                </div>
+            <span class="option-separator"></span>
+            <div class="option-group">
+                <span class="option-label">Size</span>
+                <button id="size360" class="option-btn">360p</button>
+                <button id="size480" class="option-btn active">480p</button>
+                <button id="size720" class="option-btn">720p</button>
+                <button id="size1080" class="option-btn">1080p</button>
             </div>
         </div>
+
+        <details class="panel">
+            <summary>How to Use</summary>
+            <div class="panel-content help-text">
+                <p>This demo streams video frames through <strong>LavinMQ</strong> using AMQP stream queues. Each frame is published as a message and consumed in real-time via WebSocket.</p>
+                <ol>
+                    <li>Open <strong>Video Source</strong> below and click <strong>Publish Video</strong> to extract and publish frames from a sample video to LavinMQ. This only needs to be done once &mdash; frames persist in the stream queue.</li>
+                    <li>Press <strong>play</strong> to start playback. Use the transport controls to rewind, fast-forward, or skip to the start/end.</li>
+                    <li>Adjust <strong>Speed</strong> to change playback rate relative to the original FPS. <strong>Max</strong> drains frames as fast as possible.</li>
+                    <li>Adjust <strong>Size</strong> to change the video display resolution.</li>
+                    <li>Open <strong>Statistics</strong> to see consumer, connection, and video details.</li>
+                </ol>
+            </div>
+        </details>
+
+        <details class="panel">
+            <summary>Video Source</summary>
+            <div class="panel-content">
+                <div class="controls">
+                    <button id="runProducerBtn" class="primary">Publish Video</button>
+                    <button id="stopProducerBtn" class="secondary" disabled>Stop</button>
+                    <button id="clearBtn" class="secondary">Clear Display</button>
+                </div>
+                <div class="stat-grid compact">
+                    <div class="stat-card">
+                        <div class="stat-value" id="producerStatus">Idle</div>
+                        <div class="stat-label">Status</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="producerFrames">0</div>
+                        <div class="stat-label">Frames Published</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="producerData">0MB</div>
+                        <div class="stat-label">Data Sent</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="avgProducerFps">-</div>
+                        <div class="stat-label">Avg Publish FPS</div>
+                    </div>
+                </div>
+            </div>
+        </details>
+
+        <details class="panel">
+            <summary>Statistics</summary>
+            <div class="panel-content">
+                <h3>Consumer</h3>
+                <div class="stat-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="frameCount">0</div>
+                        <div class="stat-label">Frames Received</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="fps">0</div>
+                        <div class="stat-label">Receive FPS</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="currentFrame">-</div>
+                        <div class="stat-label">Current Frame</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="latency">-</div>
+                        <div class="stat-label">Processing Time (ms)</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="displayFpsActual">0</div>
+                        <div class="stat-label">Display FPS</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="totalDataReceived">0MB</div>
+                        <div class="stat-label">Data Received</div>
+                    </div>
+                </div>
+
+                <h3>Connection</h3>
+                <div class="stat-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="connectionStatus">-</div>
+                        <div class="stat-label">Status</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="uptime">0s</div>
+                        <div class="stat-label">Uptime</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="droppedFrames">0</div>
+                        <div class="stat-label">Dropped Frames</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="queueInfo">0</div>
+                        <div class="stat-label">Frame Queue</div>
+                    </div>
+                </div>
+
+                <h3>Video Info</h3>
+                <div class="stat-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="videoResolution">-</div>
+                        <div class="stat-label">Resolution</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="videoFps">-</div>
+                        <div class="stat-label">Original FPS</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="videoDuration">-</div>
+                        <div class="stat-label">Duration</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="videoCodec">-</div>
+                        <div class="stat-label">Codec</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="compressionRatio">-</div>
+                        <div class="stat-label">Compression Ratio</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="avgFrameSize">-</div>
+                        <div class="stat-label">Avg Frame Size</div>
+                    </div>
+                </div>
+            </div>
+        </details>
     </div>
 
-    <script>
-        let ws = null;
-        let frameCount = 0;
-        let lastFrameTime = Date.now();
-        let fpsCounter = 0;
-        let fpsInterval;
-        let producerStatsInterval;
-        let videoMetadataInterval;
-        
-        // Frame display queue and rate limiting
-        let frameQueue = [];
-        let isDisplaying = false;
-        let displayInterval = 200; // milliseconds between frame displays (5 FPS)
-        let lastDisplayTime = 0;
-        let unlimitedMode = false;
-        
-        // Video metadata
-        let currentVideoMetadata = null;
-        let userSetFps = false; // Track if user has manually set FPS
-
-        const statusElement = document.getElementById('status');
-        const frameDisplay = document.getElementById('frameDisplay');
-        const frameCountElement = document.getElementById('frameCount');
-        const fpsElement = document.getElementById('fps');
-        const currentFrameElement = document.getElementById('currentFrame');
-        const latencyElement = document.getElementById('latency');
-        
-        // Producer stats elements
-        const producerStatusElement = document.getElementById('producerStatus');
-        const producerProgressElement = document.getElementById('producerProgress');
-        const producerFpsElement = document.getElementById('producerFps');
-        const producerFramesElement = document.getElementById('producerFrames');
-        const producerDataElement = document.getElementById('producerData');
-        
-        // Video metadata elements
-        const videoResolutionElement = document.getElementById('videoResolution');
-        const videoFpsElement = document.getElementById('videoFps');
-        const videoDurationElement = document.getElementById('videoDuration');
-        const videoCodecElement = document.getElementById('videoCodec');
-        
-        // New stats elements
-        const displayFpsActualElement = document.getElementById('displayFpsActual');
-        const totalDataReceivedElement = document.getElementById('totalDataReceived');
-        const avgProducerFpsElement = document.getElementById('avgProducerFps');
-        const compressionRatioElement = document.getElementById('compressionRatio');
-        const avgFrameSizeElement = document.getElementById('avgFrameSize');
-        const connectionStatusElement = document.getElementById('connectionStatus');
-        const uptimeElement = document.getElementById('uptime');
-        const droppedFramesElement = document.getElementById('droppedFrames');
-        const networkLatencyElement = document.getElementById('networkLatency');
-        
-        // Stats tracking variables
-        let sessionStartTime = null;
-        let totalDataReceived = 0;
-        let frameReceiveTimes = [];
-        let frameDisplayTimes = [];
-        let producerFpsHistory = [];
-        let droppedFrameCount = 0;
-        let lastFrameNumber = -1;
-        let uptimeInterval = null;
-
-        function updateStatus(message, type) {
-            statusElement.textContent = message;
-            statusElement.className = `status ${type}`;
-        }
-
-        function parseBinaryMessage(arrayBuffer) {
-            // Parse binary message format
-            // Structure: frameNumber(4) + timestamp(8) + mimeTypeLength(1) + mimeType + metadataLength(4) + metadata + imageData
-            
-            const dataView = new DataView(arrayBuffer);
-            let offset = 0;
-            
-            // Read header
-            const frameNumber = dataView.getUint32(offset, true); offset += 4;
-            const timestamp = Number(dataView.getBigUint64(offset, true)); offset += 8;
-            const mimeTypeLength = dataView.getUint8(offset); offset += 1;
-            
-            // Read mime type
-            const mimeTypeBytes = new Uint8Array(arrayBuffer, offset, mimeTypeLength);
-            const mimeType = new TextDecoder().decode(mimeTypeBytes);
-            offset += mimeTypeLength;
-            
-            // Read metadata
-            const metadataLength = dataView.getUint32(offset, true); offset += 4;
-            let metadata = null;
-            if (metadataLength > 0) {
-                const metadataBytes = new Uint8Array(arrayBuffer, offset, metadataLength);
-                const metadataText = new TextDecoder().decode(metadataBytes);
-                metadata = JSON.parse(metadataText);
-                offset += metadataLength;
-            }
-            
-            // Read image data
-            const imageBytes = new Uint8Array(arrayBuffer, offset);
-            
-            // Convert to base64 for img src
-            let binary = '';
-            for (let i = 0; i < imageBytes.byteLength; i++) {
-                binary += String.fromCharCode(imageBytes[i]);
-            }
-            const data = btoa(binary);
-            
-            return {
-                frameNumber,
-                timestamp,
-                data,
-                mimeType,
-                metadata
-            };
-        }
-
-        function connect() {
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${window.location.host}`;
-            
-            ws = new WebSocket(wsUrl);
-            
-            ws.onopen = function() {
-                updateStatus('Connected - Waiting for frames', 'connected');
-                connectionStatusElement.textContent = 'Connected';
-                sessionStartTime = Date.now();
-                startUptimeCounter();
-                console.log('Connected to server');
-            };
-            
-            ws.onmessage = function(event) {
-                try {
-                    const frameData = JSON.parse(event.data);
-                    console.log('WebSocket received frame:', frameData.frameNumber);
-                    
-                    // Handle video metadata from first frame
-                    if (frameData.metadata && !currentVideoMetadata) {
-                        currentVideoMetadata = frameData.metadata;
-                        updateVideoMetadataDisplay();
-                        // Only auto-set FPS if user hasn't manually set it
-                        if (!userSetFps) {
-                            setDisplayFpsFromVideo();
-                        }
-                    }
-                    
-                    // Use queue system
-                    displayFrame(frameData);
-                } catch (error) {
-                    console.error('Error parsing frame data:', error);
-                    console.log('Raw message:', typeof event.data === 'string' ? event.data.substring(0, 100) : 'Binary data');
-                }
-            };
-            
-            ws.onclose = function() {
-                updateStatus('Connection closed - Click reconnect to try again', 'error');
-                connectionStatusElement.textContent = 'Disconnected';
-                stopUptimeCounter();
-                console.log('Connection closed');
-            };
-            
-            ws.onerror = function(error) {
-                updateStatus('Connection error - Check if server is running', 'error');
-                connectionStatusElement.textContent = 'Error';
-                console.error('WebSocket error:', error);
-            };
-        }
-
-        function displayFrame(frameData) {
-            console.log(`Received frame ${frameData.frameNumber} via WebSocket`);
-            
-            // Add frame to queue with receive timestamp
-            frameData.receivedAt = Date.now();
-            
-            if (unlimitedMode) {
-                // In unlimited mode, display immediately and clear queue
-                frameQueue = [frameData]; // Keep only latest frame
-                actuallyDisplayFrame(frameData);
-                updateQueueInfo();
-            } else {
-                // Normal queued mode
-                frameQueue.push(frameData);
-                updateQueueInfo();
-                
-                // Start display timer if not running
-                if (!isDisplaying) {
-                    isDisplaying = true;
-                    processNextFrame();
-                }
-            }
-        }
-        
-        function processNextFrame() {
-            if (unlimitedMode) {
-                // In unlimited mode, don't schedule next frame processing
-                isDisplaying = false;
-                return;
-            }
-            
-            if (frameQueue.length === 0) {
-                isDisplaying = false;
-                console.log('Queue empty, stopping display');
-                return;
-            }
-            
-            // Get and display next frame
-            const frameData = frameQueue.shift();
-            const processingStartTime = Date.now();
-            console.log(`Displaying frame ${frameData.frameNumber}, queue: ${frameQueue.length}`);
-            
-            // Add processing start time to frame data
-            frameData.processingStartTime = processingStartTime;
-            actuallyDisplayFrame(frameData);
-            
-            // Schedule next frame
-            setTimeout(processNextFrame, displayInterval);
-        }
-        
-        function actuallyDisplayFrame(frameData) {
-            const { frameNumber, timestamp, data, mimeType, receivedAt, processingStartTime } = frameData;
-            
-            // Hide placeholder text if it exists
-            const placeholder = frameDisplay.querySelector('.placeholder');
-            if (placeholder) {
-                placeholder.style.display = 'none';
-            }
-            
-            // Find existing image or create new one
-            let img = frameDisplay.querySelector('img');
-            if (!img) {
-                img = document.createElement('img');
-                img.style.maxWidth = '100%';
-                img.style.height = 'auto';
-                frameDisplay.appendChild(img);
-            }
-            
-            // Set proper dimensions if metadata is available
-            if (currentVideoMetadata) {
-                const maxWidth = 450; // Max display width to match container
-                const aspectRatio = currentVideoMetadata.width / currentVideoMetadata.height;
-                const displayWidth = Math.min(maxWidth, currentVideoMetadata.width);
-                const displayHeight = displayWidth / aspectRatio;
-                
-                // Only set width and let height scale naturally to maintain aspect ratio
-                img.style.maxWidth = `${displayWidth}px`;
-                img.style.height = 'auto';
-                img.style.width = 'auto';
-            }
-            
-            // Update the image source (avoids flicker by reusing same element)
-            img.src = `data:${mimeType};base64,${data}`;
-            img.alt = `Frame ${frameNumber}`;
-            
-            const processingEndTime = Date.now();
-            
-            // Update statistics
-            frameCount++;
-            fpsCounter++;
-            frameCountElement.textContent = frameCount;
-            currentFrameElement.textContent = frameNumber;
-            
-            // Calculate actual processing time (excluding FPS delay)
-            const processingTime = processingEndTime - processingStartTime;
-            latencyElement.textContent = `${processingTime}ms`;
-            
-            // Track data received (estimate based on base64 data length)
-            const frameSize = data.length * 0.75 / 1024 / 1024; // Convert base64 to MB
-            totalDataReceived += frameSize;
-            totalDataReceivedElement.textContent = `${totalDataReceived.toFixed(2)}MB`;
-            
-            // Track frame receive times for receive FPS (keep existing logic)
-            frameReceiveTimes.push(Date.now());
-            if (frameReceiveTimes.length > 60) frameReceiveTimes.shift(); // Keep last 60 frames
-            
-            // Track frame display times for actual display FPS
-            frameDisplayTimes.push(processingEndTime);
-            if (frameDisplayTimes.length > 30) frameDisplayTimes.shift(); // Keep last 30 displays
-            
-            // Calculate actual display FPS
-            if (frameDisplayTimes.length > 1) {
-                const displayTimeSpan = (frameDisplayTimes[frameDisplayTimes.length - 1] - frameDisplayTimes[0]) / 1000;
-                const actualDisplayFps = (frameDisplayTimes.length - 1) / displayTimeSpan;
-                displayFpsActualElement.textContent = actualDisplayFps.toFixed(1);
-            }
-            
-            // Check for dropped frames
-            if (lastFrameNumber >= 0 && frameNumber > lastFrameNumber + 1) {
-                droppedFrameCount += (frameNumber - lastFrameNumber - 1);
-                droppedFramesElement.textContent = droppedFrameCount;
-            }
-            lastFrameNumber = frameNumber;
-            
-            // Calculate compression ratio and average frame size
-            if (currentVideoMetadata) {
-                const uncompressedSize = (currentVideoMetadata.width * currentVideoMetadata.height * 3) / 1024 / 1024; // RGB bytes to MB
-                const compressionRatio = uncompressedSize / frameSize;
-                compressionRatioElement.textContent = `${compressionRatio.toFixed(1)}:1`;
-                avgFrameSizeElement.textContent = `${(frameSize * 1024).toFixed(1)}KB`;
-            }
-            
-            // Update queue info
-            updateQueueInfo();
-            
-            console.log(`Displayed frame ${frameNumber}, processing time: ${processingTime}ms`);
-        }
-        
-        function updateDisplayFps() {
-            const input = document.getElementById('displayFps');
-            let fps = parseFloat(input.value);
-            
-            // Mark that user has set FPS
-            userSetFps = true;
-            
-            // Disable unlimited mode when FPS is set
-            unlimitedMode = false;
-            
-            // Validate FPS range
-            if (fps < 0.1) {
-                fps = 0.1;
-                input.value = fps;
-            } else if (fps > 60) {
-                fps = 60;
-                input.value = fps;
-            }
-            
-            displayInterval = Math.round(1000 / fps);
-            console.log(`Display FPS changed to ${fps} FPS (${displayInterval}ms interval)`);
-            updateQueueInfo();
-        }
-        
-        function setPresetFps(fps) {
-            const input = document.getElementById('displayFps');
-            input.value = fps;
-            userSetFps = true; // Mark as user set
-            updateDisplayFps();
-        }
-        
-        function setUnlimitedMode() {
-            unlimitedMode = true;
-            userSetFps = true; // Mark as user set
-            const input = document.getElementById('displayFps');
-            input.value = '∞';
-            console.log('Unlimited mode enabled - displaying frames as fast as possible');
-            updateQueueInfo();
-        }
-        
-        function updateQueueInfo() {
-            const queueInfo = document.getElementById('queueInfo');
-            const modeText = unlimitedMode ? ' (Unlimited Mode)' : '';
-            queueInfo.textContent = `Queue: ${frameQueue.length} frames${modeText}`;
-            
-            // Color code based on queue size or mode
-            if (unlimitedMode) {
-                queueInfo.style.color = '#64b5f6'; // Blue for unlimited mode
-            } else if (frameQueue.length > 20) {
-                queueInfo.style.color = '#dc3545'; // Red for high queue
-            } else if (frameQueue.length > 10) {
-                queueInfo.style.color = '#fd7e14'; // Orange for medium queue
-            } else {
-                queueInfo.style.color = '#bbb'; // Gray for low queue
-            }
-        }
-
-        function updateFPS() {
-            fpsElement.textContent = fpsCounter;
-            fpsCounter = 0;
-        }
-
-        function startConsumer() {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                updateStatus('Already connected', 'connected');
-                return;
-            }
-            
-            updateStatus('Connecting...', 'connecting');
-            connect();
-            
-            // Only auto-set FPS if user hasn't manually set it
-            if (currentVideoMetadata && !userSetFps) {
-                setDisplayFpsFromVideo();
-            }
-            
-            document.getElementById('startBtn').disabled = true;
-            document.getElementById('stopBtn').disabled = false;
-        }
-
-        function stopConsumer() {
-            if (ws) {
-                ws.close();
-                ws = null;
-            }
-            updateStatus('Disconnected', 'error');
-            
-            document.getElementById('startBtn').disabled = false;
-            document.getElementById('stopBtn').disabled = true;
-        }
-
-        async function runProducer() {
-            const btn = document.getElementById('runProducerBtn');
-            btn.disabled = true;
-            btn.textContent = 'Running Producer...';
-            
-            try {
-                const response = await fetch('/api/run-producer', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
-                
-                const result = await response.json();
-                
-                if (response.ok) {
-                    updateStatus(`Producer started: ${result.message}`, 'connected');
-                    // Start polling for producer stats
-                    startProducerStatsPolling();
-                } else {
-                    updateStatus(`Producer error: ${result.error}`, 'error');
-                }
-                
-            } catch (error) {
-                updateStatus(`Failed to start producer: ${error.message}`, 'error');
-            } finally {
-                btn.disabled = false;
-                btn.textContent = 'Run Producer';
-            }
-        }
-
-        async function fetchProducerStats() {
-            try {
-                const response = await fetch('/api/producer-stats');
-                const stats = await response.json();
-                updateProducerStats(stats);
-            } catch (error) {
-                console.error('Failed to fetch producer stats:', error);
-            }
-        }
-
-        function updateProducerStats(stats) {
-            producerStatusElement.textContent = stats.isRunning ? 'Running' : 'Idle';
-            producerStatusElement.parentElement.style.backgroundColor = stats.isRunning ? '#d4edda' : '#f8f9fa';
-            
-            producerProgressElement.textContent = `${stats.progress.toFixed(1)}%`;
-            producerFpsElement.textContent = stats.currentFps.toFixed(1);
-            producerFramesElement.textContent = `${stats.framesPublished}/${stats.totalFrames}`;
-            producerDataElement.textContent = `${stats.totalDataSent.toFixed(2)}MB`;
-            
-            // Track producer FPS history for average
-            if (stats.currentFps > 0) {
-                producerFpsHistory.push(stats.currentFps);
-                if (producerFpsHistory.length > 20) producerFpsHistory.shift(); // Keep last 20 readings
-                
-                const avgProducerFps = producerFpsHistory.reduce((a, b) => a + b, 0) / producerFpsHistory.length;
-                avgProducerFpsElement.textContent = avgProducerFps.toFixed(1);
-            }
-        }
-
-        function startProducerStatsPolling() {
-            if (producerStatsInterval) {
-                clearInterval(producerStatsInterval);
-            }
-            
-            // Fetch stats immediately and then every 500ms
-            fetchProducerStats();
-            producerStatsInterval = setInterval(fetchProducerStats, 500);
-            
-            // Stop polling after producer is likely done (give it extra time)
-            setTimeout(() => {
-                if (producerStatsInterval) {
-                    clearInterval(producerStatsInterval);
-                    producerStatsInterval = null;
-                    // Fetch final stats
-                    setTimeout(fetchProducerStats, 1000);
-                }
-            }, 30000); // 30 seconds timeout
-        }
-
-        function testDisplayFrame(frameData) {
-            const { frameNumber, timestamp, data, mimeType } = frameData;
-            console.log('Displaying frame directly:', frameNumber);
-            
-            // Hide placeholder
-            const placeholder = frameDisplay.querySelector('.placeholder');
-            if (placeholder) {
-                placeholder.style.display = 'none';
-            }
-            
-            // Create and display image immediately
-            const img = document.createElement('img');
-            img.src = `data:${mimeType};base64,${data}`;
-            img.alt = `Frame ${frameNumber}`;
-            img.style.maxWidth = '100%';
-            img.style.height = 'auto';
-            
-            frameDisplay.innerHTML = '';
-            frameDisplay.appendChild(img);
-            
-            // Update basic stats
-            frameCountElement.textContent = frameNumber;
-            currentFrameElement.textContent = frameNumber;
-            latencyElement.textContent = Date.now() - timestamp;
-        }
-
-        function clearDisplay() {
-            frameDisplay.innerHTML = '<div class="placeholder">Display cleared - Waiting for frames...</div>';
-            frameCount = 0;
-            fpsCounter = 0;
-            frameCountElement.textContent = '0';
-            fpsElement.textContent = '0';
-            currentFrameElement.textContent = '-';
-            latencyElement.textContent = '-';
-            
-            // Reset new stats
-            totalDataReceived = 0;
-            frameReceiveTimes = [];
-            frameDisplayTimes = [];
-            droppedFrameCount = 0;
-            lastFrameNumber = -1;
-            totalDataReceivedElement.textContent = '0MB';
-            displayFpsActualElement.textContent = '0';
-            droppedFramesElement.textContent = '0';
-            compressionRatioElement.textContent = '-';
-            avgFrameSizeElement.textContent = '-';
-            
-            // Clear frame queue
-            frameQueue = [];
-            updateQueueInfo();
-        }
-
-        async function restartConsumer(fromBeginning = true) {
-            try {
-                const response = await fetch('/api/restart-consumer', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ fromBeginning })
-                });
-                
-                const result = await response.json();
-                
-                if (response.ok) {
-                    updateStatus(`Consumer restarted: ${result.message}`, 'connected');
-                    
-                    // Update mode indicator
-                    const streamModeElement = document.getElementById('streamMode');
-                    streamModeElement.textContent = `Mode: ${result.mode === 'replay' ? 'Replay' : 'Live'}`;
-                    
-                    // Clear current display and stats
-                    clearDisplay();
-                    
-                    // Only auto-set FPS if user hasn't manually set it
-                    if (currentVideoMetadata && !userSetFps) {
-                        setDisplayFpsFromVideo();
-                    }
-                    
-                    // Ensure WebSocket is connected
-                    if (!ws || ws.readyState !== WebSocket.OPEN) {
-                        connect();
-                        document.getElementById('startBtn').disabled = true;
-                        document.getElementById('stopBtn').disabled = false;
-                    }
-                    
-                } else {
-                    updateStatus(`Consumer restart error: ${result.error}`, 'error');
-                }
-                
-            } catch (error) {
-                updateStatus(`Failed to restart consumer: ${error.message}`, 'error');
-                console.error('Error restarting consumer:', error);
-            }
-        }
-
-        async function fetchVideoMetadata() {
-            try {
-                const response = await fetch('/api/video-metadata');
-                if (response.ok) {
-                    const metadata = await response.json();
-                    currentVideoMetadata = metadata;
-                    updateVideoMetadataDisplay();
-                    // Only auto-set FPS if user hasn't manually set it
-                    if (!userSetFps) {
-                        setDisplayFpsFromVideo();
-                    }
-                } else {
-                    console.log('No video metadata available yet');
-                }
-            } catch (error) {
-                console.error('Failed to fetch video metadata:', error);
-            }
-        }
-
-        function updateVideoMetadataDisplay() {
-            if (!currentVideoMetadata) return;
-            
-            videoResolutionElement.textContent = `${currentVideoMetadata.width}x${currentVideoMetadata.height}`;
-            videoFpsElement.textContent = `${currentVideoMetadata.fps.toFixed(1)}`;
-            videoDurationElement.textContent = `${currentVideoMetadata.duration.toFixed(1)}s`;
-            videoCodecElement.textContent = currentVideoMetadata.codec;
-            
-            console.log('Updated video metadata display:', currentVideoMetadata);
-        }
-
-        function setDisplayFpsFromVideo() {
-            if (!currentVideoMetadata) return;
-            
-            const input = document.getElementById('displayFps');
-            input.value = currentVideoMetadata.fps;
-            updateDisplayFps();
-            console.log(`Auto-set display FPS to ${currentVideoMetadata.fps} from video metadata`);
-        }
-
-        function startUptimeCounter() {
-            if (uptimeInterval) clearInterval(uptimeInterval);
-            uptimeInterval = setInterval(() => {
-                if (sessionStartTime) {
-                    const uptime = Math.floor((Date.now() - sessionStartTime) / 1000);
-                    const minutes = Math.floor(uptime / 60);
-                    const seconds = uptime % 60;
-                    uptimeElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-                }
-            }, 1000);
-        }
-        
-        function stopUptimeCounter() {
-            if (uptimeInterval) {
-                clearInterval(uptimeInterval);
-                uptimeInterval = null;
-            }
-        }
-        
-        // Initialize FPS counter but don't auto-connect
-        fpsInterval = setInterval(updateFPS, 1000);
-        updateStatus('Ready - Click "Start Consumer" to begin', 'connecting');
-        connectionStatusElement.textContent = 'Ready';
-        
-        // Fetch initial producer stats and video metadata
-        fetchProducerStats();
-        fetchVideoMetadata();
-        
-        // Poll for video metadata every 2 seconds in case it becomes available
-        videoMetadataInterval = setInterval(fetchVideoMetadata, 2000);
-        
-        // Test frame queue functionality
-        console.log('Testing display queue initialization...');
-        console.log('displayInterval:', displayInterval, 'ms');
-        console.log('frameQueue:', frameQueue);
-        console.log('isDisplaying:', isDisplaying);
-
-        // Cleanup on page unload
-        window.addEventListener('beforeunload', function() {
-            if (ws) {
-                ws.close();
-            }
-            clearInterval(fpsInterval);
-            stopUptimeCounter();
-            if (producerStatsInterval) {
-                clearInterval(producerStatsInterval);
-            }
-            if (videoMetadataInterval) {
-                clearInterval(videoMetadataInterval);
-            }
-        });
-    </script>
+    <script src="index.js"></script>
 </body>
 </html>
