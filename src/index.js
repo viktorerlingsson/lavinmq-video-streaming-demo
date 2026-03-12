@@ -137,7 +137,6 @@ function ackFrame(frameNumber) {
 }
 
 function displayFrame(frameData) {
-    frameData.receivedAt = Date.now();
     frameQueue.push(frameData);
     updateQueueInfo();
 }
@@ -164,7 +163,6 @@ function displayLoop(timestamp) {
         lastDisplayTimestamp = timestamp - (elapsed % displayInterval);
 
         const frameData = frameQueue.shift();
-        frameData.processingStartTime = performance.now();
         actuallyDisplayFrame(frameData);
     }
 
@@ -466,7 +464,7 @@ function clearDisplay() {
     fpsElement.textContent = '0';
     currentFrameElement.textContent = '-';
 
-    // Reset new stats
+    // Reset stats
     totalDataReceived = 0;
     frameReceiveTimes = [];
     frameDisplayTimes = [];

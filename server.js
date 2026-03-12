@@ -6,12 +6,13 @@ const http = require('http');
 const WebSocket = require('ws');
 const { spawn } = require('child_process');
 
+const fs = require('fs');
+
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server, path: '/ws' });
 
 const PORT = process.env.PORT || 3000;
-const fs = require('fs');
 const LAVINMQ_URL = process.env.LAVINMQ_URL || 'amqp://localhost:5672';
 const QUEUE_NAME = 'video_frames';
 const SAMPLE_VIDEO_PATH = path.join(__dirname, 'sample-video.mp4');
@@ -99,8 +100,7 @@ app.post('/api/run-producer', (req, res) => {
   // Return immediately with success response
   res.json({
     success: true,
-    message: 'Producer started in background',
-    videoPath: videoPath
+    message: 'Producer started in background'
   });
 });
 

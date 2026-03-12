@@ -30,7 +30,7 @@ class VideoFrameProducer {
       // Configure as stream queue for replay capability
       const queueArgs = {
         'x-queue-type': 'stream',
-        'x-max-age': '1h' // Keep messages for 1 hour
+        'x-max-length-bytes': 1073741824 // 1 GB
       };
       
       // Add video metadata as queue arguments if provided
@@ -206,8 +206,8 @@ class VideoFrameProducer {
   }
 
   async close() {
-    if (this.channel) await this.channel.close();
-    if (this.connection) await this.connection.close();
+    try { if (this.channel) await this.channel.close(); } catch (e) { /* already closed */ }
+    try { if (this.connection) await this.connection.close(); } catch (e) { /* already closed */ }
     console.log('Disconnected from LavinMQ');
   }
 }
