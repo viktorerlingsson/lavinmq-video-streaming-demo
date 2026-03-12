@@ -5,8 +5,9 @@ const path = require('path');
 const http = require('http');
 const WebSocket = require('ws');
 const { spawn } = require('child_process');
-
 const fs = require('fs');
+const { pipeline } = require('stream/promises');
+const { Readable } = require('stream');
 
 const app = express();
 const server = http.createServer(app);
@@ -141,6 +142,7 @@ app.post('/api/restart-consumer', async (req, res) => {
       isConsuming = false;
     }
 
+    unackedMessages.clear();
     await consumer.connect();
     await consumer.startConsuming(offset);
     isConsuming = true;
@@ -255,7 +257,7 @@ class FrameConsumer {
           const jsonMessage = JSON.stringify({
             frameNumber: frameData.frameNumber,
             timestamp: frameData.timestamp,
-            data: frameData.imageData, // This is already base64
+            data: frameData.imageData,
             mimeType: frameData.mimeType,
             metadata: frameData.metadata
           });
@@ -309,13 +311,11 @@ async function ensureSampleVideo() {
     return;
   }
   console.log(`Downloading sample video from ${SAMPLE_VIDEO_URL}...`);
-  const { pipeline } = require('stream/promises');
   const response = await fetch(SAMPLE_VIDEO_URL);
   if (!response.ok) {
     console.error(`Failed to download sample video: ${response.status}`);
     return;
   }
-  const { Readable } = require('stream');
   await pipeline(Readable.fromWeb(response.body), fs.createWriteStream(SAMPLE_VIDEO_PATH));
   console.log('Sample video downloaded.');
 }

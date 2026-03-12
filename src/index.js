@@ -7,7 +7,7 @@ let videoMetadataInterval;
 
 // Frame display queue and rate limiting
 let frameQueue = [];
-let displayInterval = 200; // milliseconds between frame displays (5 FPS)
+let displayInterval = 200;
 let displayTimer = null;
 let unlimitedMode = false;
 let isPlaying = false;
@@ -42,11 +42,9 @@ const connectionStatusElement = document.getElementById('connectionStatus');
 const uptimeElement = document.getElementById('uptime');
 const droppedFramesElement = document.getElementById('droppedFrames');
 
-
 // Stats tracking variables
 let sessionStartTime = null;
 let totalDataReceived = 0;
-let frameReceiveTimes = [];
 let frameDisplayTimes = [];
 let droppedFrameCount = 0;
 let lastFrameNumber = -1;
@@ -57,9 +55,7 @@ function updateStatus(message, type) {
     statusElement.className = `status ${type}`;
 }
 
-
 let reconnectAttempts = 0;
-let reconnectTimer = null;
 let manualDisconnect = false;
 
 function connect() {
@@ -89,7 +85,6 @@ function connect() {
                 }
             }
 
-            // Use queue system
             displayFrame(frameData);
         } catch (error) {
             console.error('Error parsing frame data:', error);
@@ -122,13 +117,11 @@ function scheduleReconnect() {
     updateStatus(`Connection lost - Reconnecting in ${(delay / 1000).toFixed(0)}s...`, 'connecting');
     connectionStatusElement.textContent = 'Reconnecting...';
 
-    reconnectTimer = setTimeout(() => {
+    setTimeout(() => {
         console.log(`Reconnect attempt ${reconnectAttempts}`);
         connect();
     }, delay);
 }
-
-
 
 function ackFrame(frameNumber) {
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -150,7 +143,7 @@ function displayLoop(timestamp) {
     if (!isPlaying || frameQueue.length === 0) return;
 
     if (unlimitedMode) {
-        // Drain the entire queue each tick — ack all, render the last
+        // Drain the entire queue each tick
         while (frameQueue.length > 0) {
             const frameData = frameQueue.shift();
 
@@ -212,8 +205,6 @@ function actuallyDisplayFrame(frameData) {
     img.src = `data:${mimeType};base64,${data}`;
     img.alt = `Frame ${frameNumber}`;
 
-    const processingEndTime = Date.now();
-
     // Update statistics
     frameCount++;
     fpsCounter++;
@@ -225,15 +216,12 @@ function actuallyDisplayFrame(frameData) {
     totalDataReceived += frameSize;
     totalDataReceivedElement.textContent = `${totalDataReceived.toFixed(2)}MB`;
 
-    // Track frame receive times for receive FPS (keep existing logic)
-    frameReceiveTimes.push(Date.now());
-    if (frameReceiveTimes.length > 60) frameReceiveTimes.shift(); // Keep last 60 frames
+    const now = Date.now();
 
     // Track frame display times for actual display FPS
-    frameDisplayTimes.push(processingEndTime);
-    if (frameDisplayTimes.length > 30) frameDisplayTimes.shift(); // Keep last 30 displays
+    frameDisplayTimes.push(now);
+    if (frameDisplayTimes.length > 30) frameDisplayTimes.shift();
 
-    // Calculate actual display FPS
     if (frameDisplayTimes.length > 1) {
         const displayTimeSpan = (frameDisplayTimes[frameDisplayTimes.length - 1] - frameDisplayTimes[0]) / 1000;
         const actualDisplayFps = (frameDisplayTimes.length - 1) / displayTimeSpan;
@@ -247,16 +235,14 @@ function actuallyDisplayFrame(frameData) {
     }
     lastFrameNumber = frameNumber;
 
-    // Update video time indicator
     if (currentVideoMetadata) {
+        // Update video time indicator
         const currentTime = (frameNumber / currentVideoMetadata.fps).toFixed(1);
         const totalTime = currentVideoMetadata.duration.toFixed(1);
         document.getElementById('videoTime').textContent = `${currentTime}s / ${totalTime}s`;
-    }
 
-    // Calculate compression ratio and average frame size
-    if (currentVideoMetadata) {
-        const uncompressedSize = (currentVideoMetadata.width * currentVideoMetadata.height * 3) / 1024 / 1024; // RGB bytes to MB
+        // Compression ratio and average frame size
+        const uncompressedSize = (currentVideoMetadata.width * currentVideoMetadata.height * 3) / 1024 / 1024;
         const compressionRatio = uncompressedSize / frameSize;
         compressionRatioElement.textContent = `${compressionRatio.toFixed(1)}:1`;
         avgFrameSizeElement.textContent = `${(frameSize * 1024).toFixed(1)}KB`;
@@ -466,7 +452,6 @@ function clearDisplay() {
 
     // Reset stats
     totalDataReceived = 0;
-    frameReceiveTimes = [];
     frameDisplayTimes = [];
     droppedFrameCount = 0;
     lastFrameNumber = -1;
@@ -599,7 +584,6 @@ function setDisplaySize(sizeId) {
         document.getElementById(id).classList.toggle('active', id === sizeId);
     }
 }
-
 
 // --- Event listeners ---
 
